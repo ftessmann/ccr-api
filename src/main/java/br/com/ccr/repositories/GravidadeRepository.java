@@ -3,6 +3,7 @@ package br.com.ccr.repositories;
 import br.com.ccr.entities.Gravidade;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -11,6 +12,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+@ApplicationScoped
 public class GravidadeRepository {
 
     private static final Logger log = LogManager.getLogger(GravidadeRepository.class);

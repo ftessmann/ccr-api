@@ -5,6 +5,7 @@ import br.com.ccr.entities.Incidente;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -22,9 +23,16 @@ public class IncidenteRepository extends CrudRepositoryImpl<Incidente> {
 
     private static final Logger log = LogManager.getLogger(IncidenteRepository.class);
 
+    @Inject
     private UsuarioRepository usuarioRepository;
+
+    @Inject
     private LocalizacaoRepository localizacaoRepository;
+
+    @Inject
     private GravidadeRepository gravidadeRepository;
+
+    @Inject
     private EquipeRepository equipeRepository;
 
     public IncidenteRepository() {

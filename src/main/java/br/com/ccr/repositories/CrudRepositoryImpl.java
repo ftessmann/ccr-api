@@ -1,6 +1,7 @@
 package br.com.ccr.repositories;
 
 import br.com.ccr.entities.BaseModel;
+import br.com.ccr.entities.Endereco;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
 import org.apache.logging.log4j.LogManager;
@@ -111,7 +112,7 @@ public abstract class CrudRepositoryImpl<T extends BaseModel> implements CrudRep
     }
 
     protected int getUpdateQueryIdParameterIndex() {
-        return 5; // valos ajustado conforme o repository
+        return 5; // valor ajustado conforme o repository
     }
 
     @Override

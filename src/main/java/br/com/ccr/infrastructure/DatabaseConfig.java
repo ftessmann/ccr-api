@@ -12,15 +12,6 @@ public class DatabaseConfig {
     static String KEY = ConfigProvider.getConfig().getValue("quarkus.datasource.password", String.class);
 
     public static Connection getConnection() throws SQLException {
-        if (URL == null) {
-            throw new SQLException("DB_URL environment variable is not set");
-        }
-        if (USER == null) {
-            throw new SQLException("DB_USER environment variable is not set");
-        }
-        if (KEY == null) {
-            throw new SQLException("DB_PASSWORD environment variable is not set");
-        }
         return DriverManager.getConnection(URL, USER, KEY);
     }
 }

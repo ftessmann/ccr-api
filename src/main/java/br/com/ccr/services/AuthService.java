@@ -40,7 +40,6 @@ public class AuthService {
 
         Set<String> roles = new HashSet<>();
 
-        // Adiciona o cargo como role
         if (usuario.getCargo() != null) {
             roles.add(usuario.getCargo().name());
         }

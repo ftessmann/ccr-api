@@ -1,13 +1,15 @@
 package br.com.ccr.infrastructure;
 
+import org.eclipse.microprofile.config.ConfigProvider;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseConfig {
-    public static final String URL = System.getenv("DB_URL");
-    public static final String USER = System.getenv("DB_USER");
-    public static final String KEY = System.getenv("DB_PASSWORD");
+    static String URL = ConfigProvider.getConfig().getValue("quarkus.datasource.jdbc.url", String.class);
+    static String USER = ConfigProvider.getConfig().getValue("quarkus.datasource.username", String.class);
+    static String KEY = ConfigProvider.getConfig().getValue("quarkus.datasource.password", String.class);
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, KEY);

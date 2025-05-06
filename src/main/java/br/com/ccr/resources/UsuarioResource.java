@@ -36,8 +36,8 @@ public class UsuarioResource {
             @QueryParam("email") String email,
             @QueryParam("cpf") String cpf,
             @QueryParam("page") @DefaultValue("0") int page,
-            @QueryParam("limit") @DefaultValue("20") int limit) {
-
+            @QueryParam("limit") @DefaultValue("20") int limit
+    ) {
         List<Usuario> usuarios = usuarioRepository.listarTodos();
 
         if (cargo != null && !cargo.isEmpty()) {

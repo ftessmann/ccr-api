@@ -30,7 +30,7 @@ public class UsuarioResource {
 
     @GET
     @RolesAllowed({"ADMIN", "GERENTE"})
-    public Response listarUsuariosComFiltros(
+    public Response listar(
             @QueryParam("cargo") String cargo,
             @QueryParam("nome") String nome,
             @QueryParam("email") String email,
@@ -117,8 +117,11 @@ public class UsuarioResource {
 
     @PUT
     @Path("/{id}")
-    @RolesAllowed({"ADMIN", "GERENTE"})
-    public Response atualizar(@PathParam("id") int id, Usuario usuario) {
+    public Response atualizar(@PathParam("id") int id, Usuario usuario, @Context SecurityContext securityContext) {
+        if (!temPermissaoParaAcessarUsuario(id, securityContext)) {
+            return Response.status(Response.Status.FORBIDDEN).build();
+        }
+
         if (usuarioRepository.buscarPorId(id).isEmpty()) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }

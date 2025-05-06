@@ -3,6 +3,7 @@ package br.com.ccr.repositories;
 import br.com.ccr.entities.Vagao;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@ApplicationScoped
 public class VagaoRepository extends CrudRepositoryImpl<Vagao> {
 
     private static final Logger log = LogManager.getLogger(VagaoRepository.class);

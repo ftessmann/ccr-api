@@ -4,6 +4,7 @@ import br.com.ccr.entities.Equipe;
 import br.com.ccr.entities.Usuario;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -16,13 +17,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@ApplicationScoped
 public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
 
     private static final Logger log = LogManager.getLogger(EquipeRepository.class);
 
-    private final UsuarioRepository usuarioRepository;
-    private final LocalizacaoRepository localizacaoRepository;
-    private final EstacaoRepository estacaoRepository;
+    private UsuarioRepository usuarioRepository;
+    private LocalizacaoRepository localizacaoRepository;
+    private EstacaoRepository estacaoRepository;
+
+    public EquipeRepository() {
+    }
 
     public EquipeRepository(
             UsuarioRepository usuarioRepository,

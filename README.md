@@ -6,6 +6,24 @@ If you want to learn more about Quarkus, please visit its website: <https://quar
 
 ## Running the application in dev mode
 
+### Generate SSL Keys
+First, navigate to correct folder and generate the SSL Keys to JWT Auth
+
+```shell script
+cd src/main/resources
+```
+
+#### Private Key
+```shell script
+openssl genrsa -out privateKey.pem 2048
+```
+
+#### Public Key
+Generate the public key with the private
+```shell script
+openssl rsa -in privateKey.pem -pubout -out publicKey.pem
+```
+
 You can run your application in dev mode that enables live coding using:
 
 ```shell script

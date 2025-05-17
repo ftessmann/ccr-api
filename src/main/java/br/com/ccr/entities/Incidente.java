@@ -16,6 +16,7 @@ public class Incidente extends BaseModel{
     private String nome;
     private Usuario criador;
     private LocalDateTime date;
+    private Boolean isResolved;
 
     public Localizacao getLocalizacao() {
         return localizacao;

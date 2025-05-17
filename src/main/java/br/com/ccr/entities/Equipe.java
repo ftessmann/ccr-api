@@ -1,19 +1,20 @@
 package br.com.ccr.entities;
 
-import lombok.*;
-
 import java.util.ArrayList;
+import java.util.Objects;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@ToString
-@EqualsAndHashCode
 public class Equipe extends BaseModel {
     private String nome;
     private ArrayList<Usuario> integrantes;
-    private Localizacao localizacao;
     private Estacao base;
+
+    public Equipe() {}
+
+    public Equipe(String nome, ArrayList<Usuario> integrantes, Estacao base) {
+        this.nome = nome;
+        this.integrantes = integrantes;
+        this.base = base;
+    }
 
     public String getNome() {
         return nome;
@@ -31,19 +32,33 @@ public class Equipe extends BaseModel {
         this.integrantes = integrantes;
     }
 
-    public Localizacao getLocalizacao() {
-        return localizacao;
-    }
-
-    public void setLocalizacao(Localizacao localizacao) {
-        this.localizacao = localizacao;
-    }
-
     public Estacao getBase() {
         return base;
     }
 
     public void setBase(Estacao base) {
         this.base = base;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        Equipe equipe = (Equipe) o;
+        return Objects.equals(nome, equipe.nome) && Objects.equals(integrantes, equipe.integrantes) && Objects.equals(base, equipe.base);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), nome, integrantes, base);
+    }
+
+    @Override
+    public String toString() {
+        return "Equipe{" +
+                "nome='" + nome + '\'' +
+                ", integrantes=" + integrantes +
+                ", base=" + base +
+                '}';
     }
 }

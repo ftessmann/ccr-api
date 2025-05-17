@@ -82,12 +82,6 @@ public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
             stmt.setNull(index++, java.sql.Types.INTEGER);
         }
 
-        if (equipe.getLocalizacao() != null) {
-            stmt.setInt(index++, equipe.getLocalizacao().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
         stmt.setTimestamp(index++, Timestamp.valueOf(LocalDateTime.now())); // dt_criacao
         stmt.setTimestamp(index++, equipe.getUpdatedAt() != null ?
                 Timestamp.valueOf(equipe.getUpdatedAt()) : null);
@@ -104,12 +98,6 @@ public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
 
         if (equipe.getBase() != null) {
             stmt.setInt(index++, equipe.getBase().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (equipe.getLocalizacao() != null) {
-            stmt.setInt(index++, equipe.getLocalizacao().getId());
         } else {
             stmt.setNull(index++, java.sql.Types.INTEGER);
         }
@@ -141,12 +129,6 @@ public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
         }
         if (deletedAt != null) {
             equipe.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int localizacaoId = rs.getInt("T_CCR_LOCALIZACAO_id");
-        if (!rs.wasNull() && localizacaoRepository != null) {
-            localizacaoRepository.buscarPorId(localizacaoId)
-                    .ifPresent(equipe::setLocalizacao);
         }
 
         int estacaoId = rs.getInt("estacao_base_id");

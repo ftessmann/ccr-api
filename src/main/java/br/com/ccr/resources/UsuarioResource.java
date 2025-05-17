@@ -2,8 +2,11 @@ package br.com.ccr.resources;
 
 import br.com.ccr.dtos.AlterarSenhaDTO;
 import br.com.ccr.dtos.CredenciaisDTO;
+import br.com.ccr.dtos.UsuarioDTO;
 import br.com.ccr.entities.Cargo;
+import br.com.ccr.entities.Endereco;
 import br.com.ccr.entities.Usuario;
+import br.com.ccr.repositories.EnderecoRepository;
 import br.com.ccr.repositories.UsuarioRepository;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -14,6 +17,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +28,9 @@ public class UsuarioResource {
 
     @Inject
     UsuarioRepository usuarioRepository;
+
+    @Inject
+    EnderecoRepository enderecoRepository;
 
     @Inject
     JsonWebToken jwt;
@@ -109,10 +116,39 @@ public class UsuarioResource {
     }
 
     @POST
-    @RolesAllowed({"ADMIN", "GERENTE"})
-    public Response criar(Usuario usuario) {
-        usuarioRepository.salvar(usuario);
-        return Response.status(Response.Status.CREATED).entity(usuario).build();
+    @RolesAllowed({"ADMIN", "MANAGER"})
+    public Response criar(UsuarioDTO usuarioDTO) {
+        try {
+            Usuario usuario = new Usuario();
+            usuario.setNome(usuarioDTO.getNome());
+            usuario.setCpf(usuarioDTO.getCpf());
+            usuario.setEmail(usuarioDTO.getEmail());
+            usuario.setSenha(usuarioDTO.getSenha());
+            usuario.setTelefone(usuarioDTO.getTelefone());
+            usuario.setCargo(usuarioDTO.getCargo());
+            usuario.setSetor(usuarioDTO.getSetor());
+
+            usuario.setCreatedAt(LocalDateTime.now());
+
+            if (usuarioDTO.getEnderecoId() != 0) {
+                Endereco endereco = new Endereco();
+                endereco.setId(usuarioDTO.getEnderecoId());
+                usuario.setEndereco(endereco);
+            }
+
+            Usuario usuarioSalvo = usuarioRepository.salvar(usuario);
+            if (usuarioSalvo == null) {
+                return Response.status(422)
+                        .entity("Erro ao criar usuário: entidade inválida")
+                        .build();
+            }
+            return Response.status(Response.Status.CREATED).entity(usuarioSalvo).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro interno: " + e.getMessage())
+                    .build();
+        }
     }
 
     @PUT

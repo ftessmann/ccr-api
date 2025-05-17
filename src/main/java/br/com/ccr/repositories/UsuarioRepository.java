@@ -1,6 +1,7 @@
 package br.com.ccr.repositories;
 
 import br.com.ccr.entities.Cargo;
+import br.com.ccr.entities.Setor;
 import br.com.ccr.entities.Usuario;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
@@ -24,19 +25,24 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
     private static final Logger log = LogManager.getLogger(UsuarioRepository.class);
 
     @Inject
-    EnderecoRepository enderecoRepository;
+    private EnderecoRepository enderecoRepository;
 
     @Inject
-    CargoRepository cargoRepository;
+    private CargoRepository cargoRepository;
 
-    public UsuarioRepository(EnderecoRepository enderecoRepository, CargoRepository cargoRepository) {
+    @Inject
+    private SetorRepository setorRepository;
+
+    public UsuarioRepository(EnderecoRepository enderecoRepository, CargoRepository cargoRepository, SetorRepository setorRepository) {
         this.enderecoRepository = enderecoRepository;
         this.cargoRepository = cargoRepository;
+        this.setorRepository = setorRepository;
     }
 
     public UsuarioRepository() {
         this.enderecoRepository = null;
         this.cargoRepository = new CargoRepository();
+        this.setorRepository = new SetorRepository();
     }
 
     @Override
@@ -47,14 +53,14 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
     @Override
     protected String getInsertQuery() {
         return "INSERT INTO T_CCR_USUARIO(nm_usuario, cpf_usuario, email_usuario, senha_usuario, telefone_usuario, " +
-                "T_CCR_ENDERECO_id_endereco, T_CCR_CARGO_TIPO_id, dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "T_CCR_ENDERECO_id_endereco, T_CCR_CARGO_TIPO_id, T_CCR_SETOR_id, dt_criacao, dt_atualizacao, dt_exclusao) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     }
 
     @Override
     protected String getUpdateQuery() {
         return "UPDATE T_CCR_USUARIO SET nm_usuario = ?, cpf_usuario = ?, email_usuario = ?, senha_usuario = ?, " +
-                "telefone_usuario = ?, T_CCR_ENDERECO_id_endereco = ?, T_CCR_CARGO_TIPO_id = ?, " +
+                "telefone_usuario = ?, T_CCR_ENDERECO_id_endereco = ?, T_CCR_CARGO_TIPO_id = ?, T_CCR_SETOR_id = ?, " +
                 "dt_atualizacao = ?, dt_exclusao = ? WHERE id_usuario = ?";
     }
 
@@ -95,9 +101,15 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
             stmt.setNull(index++, java.sql.Types.INTEGER);
         }
 
+        if (usuario.getSetor() != null) {
+            int setorId = setorRepository.getSetorId(usuario.getSetor());
+            stmt.setInt(index++, setorId);
+        } else {
+            stmt.setNull(index++, java.sql.Types.INTEGER);
+        }
+
         LocalDateTime now = LocalDateTime.now();
         stmt.setTimestamp(index++, Timestamp.valueOf(now));
-
         stmt.setTimestamp(index++, usuario.getUpdatedAt() != null ?
                 Timestamp.valueOf(usuario.getUpdatedAt()) : null);
         stmt.setTimestamp(index++, usuario.getDeletedAt() != null ?
@@ -106,7 +118,6 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
 
     @Override
     protected void prepareStatementForUpdate(PreparedStatement stmt, Usuario usuario) throws SQLException {
-
         usuario.setUpdatedAt(LocalDateTime.now());
 
         int index = 1;
@@ -128,7 +139,12 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
             stmt.setNull(index++, java.sql.Types.INTEGER);
         }
 
-        // conversão nativa do timestamp -> LocalDateTime
+        if (usuario.getSetor() != null) {
+            stmt.setInt(index++, setorRepository.getSetorId(usuario.getSetor()));
+        } else {
+            stmt.setNull(index++, java.sql.Types.INTEGER);
+        }
+
         stmt.setTimestamp(index++, Timestamp.valueOf(usuario.getUpdatedAt()));
         stmt.setTimestamp(index++, usuario.getDeletedAt() != null ?
                 Timestamp.valueOf(usuario.getDeletedAt()) : null);
@@ -138,7 +154,7 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
 
     @Override
     protected int getUpdateQueryIdParameterIndex() {
-        return 10;
+        return 11;
     }
 
     @Override
@@ -165,18 +181,22 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
             usuario.setDeletedAt(deletedAt.toLocalDateTime());
         }
 
-        // carrega o endereço
         int enderecoId = rs.getInt("T_CCR_ENDERECO_id_endereco");
         if (!rs.wasNull() && enderecoRepository != null) {
             enderecoRepository.buscarPorId(enderecoId)
                     .ifPresent(usuario::setEndereco);
         }
 
-        // carrega o cargo
         int cargoId = rs.getInt("T_CCR_CARGO_TIPO_id");
         if (!rs.wasNull()) {
             Cargo cargo = cargoRepository.getCargoById(cargoId);
             usuario.setCargo(cargo);
+        }
+
+        int setorId = rs.getInt("T_CCR_SETOR_id");
+        if (!rs.wasNull() && setorRepository != null) {
+            Setor setor = setorRepository.getSetorById(setorId);
+            usuario.setSetor(setor);
         }
 
         return usuario;
@@ -204,7 +224,7 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
         }
     }
 
-    // metodos adicionais para usuário
+    // métodos adicionais para usuário
 
     public Optional<Usuario> buscarPorCpf(String cpf) {
         try (var connection = DatabaseConfig.getConnection();
@@ -299,7 +319,34 @@ public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
         return resultado;
     }
 
-    // TODO: Passar hash da senha quando implementar front
+    public List<Usuario> buscarPorSetor(Setor setor) {
+        List<Usuario> resultado = new ArrayList<>();
+
+        int setorId = setorRepository.getSetorId(setor);
+        if (setorId == -1) {
+            return resultado;
+        }
+
+        try (var connection = DatabaseConfig.getConnection();
+             var stmt = connection.prepareStatement(
+                     "SELECT * FROM T_CCR_USUARIO WHERE T_CCR_SETOR_id = ? AND dt_exclusao IS NULL")) {
+
+            stmt.setInt(1, setorId);
+
+            try (var rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Usuario usuario = mapResultSetToEntity(rs);
+                    resultado.add(usuario);
+                    storage.put(usuario.getId(), usuario);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Erro ao buscar usuários por setor", e);
+        }
+
+        return resultado;
+    }
+
     public Optional<Usuario> autenticar(String email, String senha) {
         try (var connection = DatabaseConfig.getConnection();
              var stmt = connection.prepareStatement(

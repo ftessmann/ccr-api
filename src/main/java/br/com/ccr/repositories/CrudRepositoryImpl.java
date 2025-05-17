@@ -75,6 +75,10 @@ public abstract class CrudRepositoryImpl<T extends BaseModel> implements CrudRep
                      getInsertQuery(),
                      new String[] {getIdColumnName()})) {
 
+            if (object.getCreatedAt() == null) {
+                object.setCreatedAt(java.time.LocalDateTime.now());
+            }
+
             prepareStatementForInsert(stmt, object);
             stmt.executeUpdate();
 
@@ -82,6 +86,14 @@ public abstract class CrudRepositoryImpl<T extends BaseModel> implements CrudRep
                 if (rs.next()) {
                     int id = rs.getInt(1);
                     object.setId(id);
+
+                    Optional<T> savedObject = buscarPorId(id);
+                    if (savedObject.isPresent()) {
+                        T updated = savedObject.get();
+                        storage.put(id, updated);
+                        return updated;
+                    }
+
                     storage.put(id, object);
                 }
             }
@@ -92,6 +104,7 @@ public abstract class CrudRepositoryImpl<T extends BaseModel> implements CrudRep
             return null;
         }
     }
+
 
     // implementação padrão de métodos para repositories
     @Override

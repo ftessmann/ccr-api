@@ -5,6 +5,7 @@ import br.com.ccr.entities.Usuario;
 import br.com.ccr.entities.Vagao;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -17,14 +18,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@ApplicationScoped
 public class TremRepository extends CrudRepositoryImpl<Trem> {
 
     private static final Logger log = LogManager.getLogger(TremRepository.class);
 
-    private final LinhaRepository linhaRepository;
-    private final EstacaoRepository estacaoRepository;
-    private final UsuarioRepository usuarioRepository;
-    private final VagaoRepository vagaoRepository;
+    private LinhaRepository linhaRepository;
+    private EstacaoRepository estacaoRepository;
+    private UsuarioRepository usuarioRepository;
+    private VagaoRepository vagaoRepository;
+
+    public TremRepository() {
+    }
 
     public TremRepository(
             LinhaRepository linhaRepository,

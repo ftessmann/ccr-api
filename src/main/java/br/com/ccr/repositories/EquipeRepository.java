@@ -4,6 +4,7 @@ import br.com.ccr.entities.Equipe;
 import br.com.ccr.entities.Usuario;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -16,13 +17,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@ApplicationScoped
 public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
 
     private static final Logger log = LogManager.getLogger(EquipeRepository.class);
 
-    private final UsuarioRepository usuarioRepository;
-    private final LocalizacaoRepository localizacaoRepository;
-    private final EstacaoRepository estacaoRepository;
+    private UsuarioRepository usuarioRepository;
+    private LocalizacaoRepository localizacaoRepository;
+    private EstacaoRepository estacaoRepository;
+
+    public EquipeRepository() {
+    }
 
     public EquipeRepository(
             UsuarioRepository usuarioRepository,
@@ -77,12 +82,6 @@ public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
             stmt.setNull(index++, java.sql.Types.INTEGER);
         }
 
-        if (equipe.getLocalizacao() != null) {
-            stmt.setInt(index++, equipe.getLocalizacao().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
         stmt.setTimestamp(index++, Timestamp.valueOf(LocalDateTime.now())); // dt_criacao
         stmt.setTimestamp(index++, equipe.getUpdatedAt() != null ?
                 Timestamp.valueOf(equipe.getUpdatedAt()) : null);
@@ -99,12 +98,6 @@ public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
 
         if (equipe.getBase() != null) {
             stmt.setInt(index++, equipe.getBase().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (equipe.getLocalizacao() != null) {
-            stmt.setInt(index++, equipe.getLocalizacao().getId());
         } else {
             stmt.setNull(index++, java.sql.Types.INTEGER);
         }
@@ -136,12 +129,6 @@ public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
         }
         if (deletedAt != null) {
             equipe.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int localizacaoId = rs.getInt("T_CCR_LOCALIZACAO_id");
-        if (!rs.wasNull() && localizacaoRepository != null) {
-            localizacaoRepository.buscarPorId(localizacaoId)
-                    .ifPresent(equipe::setLocalizacao);
         }
 
         int estacaoId = rs.getInt("estacao_base_id");

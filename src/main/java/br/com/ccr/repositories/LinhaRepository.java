@@ -5,6 +5,7 @@ import br.com.ccr.entities.Linha;
 import br.com.ccr.entities.Trem;
 import br.com.ccr.infrastructure.DatabaseConfig;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -17,22 +18,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@ApplicationScoped
 public class LinhaRepository extends CrudRepositoryImpl<Linha> {
 
     private static final Logger log = LogManager.getLogger(LinhaRepository.class);
 
-    private final EstacaoRepository estacaoRepository;
-    private final TremRepository tremRepository;
+    private EstacaoRepository estacaoRepository;
+    private TremRepository tremRepository;
+
 
     public LinhaRepository(EstacaoRepository estacaoRepository, TremRepository tremRepository) {
         this.estacaoRepository = estacaoRepository;
         this.tremRepository = tremRepository;
     }
 
-    public LinhaRepository() {
-        this.estacaoRepository = null;
-        this.tremRepository = null;
-    }
+    public LinhaRepository() {}
 
     @Override
     protected String getTableName() {

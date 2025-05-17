@@ -21,6 +21,8 @@ public class EnderecoRepository extends CrudRepositoryImpl<Endereco> {
 
     private static final Logger log = LogManager.getLogger(EnderecoRepository.class);
 
+    public EnderecoRepository() {}
+
     @Override
     protected String getTableName() {
         return "T_CCR_ENDERECO";

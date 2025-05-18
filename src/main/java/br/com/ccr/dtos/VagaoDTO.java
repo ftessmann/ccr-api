@@ -1,14 +1,16 @@
-package br.com.ccr.entities;
+package br.com.ccr.dtos;
 
-import lombok.*;
-
-@Data
-@ToString
-@EqualsAndHashCode
-@AllArgsConstructor
-@NoArgsConstructor
-public class Vagao extends BaseModel {
+public class VagaoDTO {
+    private Integer id;
     private String numeracao;
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
 
     public String getNumeracao() {
         return numeracao;

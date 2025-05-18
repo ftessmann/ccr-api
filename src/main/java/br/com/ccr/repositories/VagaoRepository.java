@@ -2,210 +2,171 @@ package br.com.ccr.repositories;
 
 import br.com.ccr.entities.Vagao;
 import br.com.ccr.infrastructure.DatabaseConfig;
-
 import jakarta.enterprise.context.ApplicationScoped;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
-public class VagaoRepository extends CrudRepositoryImpl<Vagao> {
+public class VagaoRepository {
 
-    private static final Logger log = LogManager.getLogger(VagaoRepository.class);
+    public Vagao save(Vagao vagao) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_vagao (numeracao, created_at) VALUES (?, CURRENT_TIMESTAMP)";
 
-    private final TremRepository tremRepository;
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-    public VagaoRepository(TremRepository tremRepository) {
-        this.tremRepository = tremRepository;
-    }
+            stmt.setString(1, vagao.getNumeracao());
 
-    public VagaoRepository() {
-        this.tremRepository = null;
-    }
+            int affectedRows = stmt.executeUpdate();
 
-    @Override
-    protected String getTableName() {
-        return "T_CCR_VAGAO";
-    }
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar vagão, nenhuma linha afetada.");
+            }
 
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_VAGAO(numeracao, T_CCR_TREM_id_trem, dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?)";
-    }
-
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_VAGAO SET numeracao = ?, T_CCR_TREM_id_trem = ?, " +
-                "dt_atualizacao = ?, dt_exclusao = ? WHERE id_vagao = ?";
-    }
-
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_VAGAO WHERE id_vagao = ? AND dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_VAGAO WHERE dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_VAGAO SET dt_exclusao = ? WHERE id_vagao = ?";
-    }
-
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Vagao vagao) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, vagao.getNumeracao());
-
-        if (vagao.getTrem() != null) {
-            stmt.setInt(index++, vagao.getTrem().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        vagao.setCreatedAt(now);
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, vagao.getUpdatedAt() != null ?
-                Timestamp.valueOf(vagao.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, vagao.getDeletedAt() != null ?
-                Timestamp.valueOf(vagao.getDeletedAt()) : null);
-    }
-
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Vagao vagao) throws SQLException {
-
-        LocalDateTime now = LocalDateTime.now();
-        vagao.setUpdatedAt(now);
-
-        int index = 1;
-        stmt.setString(index++, vagao.getNumeracao());
-
-        if (vagao.getTrem() != null) {
-            stmt.setInt(index++, vagao.getTrem().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, vagao.getDeletedAt() != null ?
-                Timestamp.valueOf(vagao.getDeletedAt()) : null);
-
-        stmt.setInt(index++, vagao.getId());
-    }
-
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 5;
-    }
-
-    @Override
-    protected Vagao mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Vagao vagao = new Vagao();
-        vagao.setId(rs.getInt("id_vagao"));
-        vagao.setNumeracao(rs.getString("numeracao"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-
-        if (createdAt != null) {
-            vagao.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        if (updatedAt != null) {
-            vagao.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            vagao.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int tremId = rs.getInt("T_CCR_TREM_id_trem");
-        if (!rs.wasNull() && tremRepository != null) {
-            tremRepository.buscarPorId(tremId)
-                    .ifPresent(vagao::setTrem);
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    vagao.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar vagão, nenhum ID obtido.");
+                }
+            }
         }
 
         return vagao;
     }
 
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
+    public Optional<Vagao> findById(Integer id) throws SQLException {
+        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+                "FROM tb_mvp_vagao v " +
+                "WHERE v.id = ? AND v.deleted_at IS NULL";
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            int result = stmt.executeUpdate();
+            stmt.setInt(1, id);
 
-            if (result > 0) {
-                Optional<Vagao> vagao = buscarPorId(id);
-                vagao.ifPresent(v -> {
-                    v.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, v);
-                });
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao remover vagão", e);
-        }
-    }
-
-    // metodos adicionais para vagao
-
-    public List<Vagao> buscarPorNumeracao(String numeracao) {
-        List<Vagao> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_VAGAO WHERE numeracao = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, numeracao);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Vagao vagao = mapResultSetToEntity(rs);
-                    resultado.add(vagao);
-                    storage.put(vagao.getId(), vagao);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Vagao vagao = mapResultSetToVagao(rs);
+                    return Optional.of(vagao);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar vagões por numeração", e);
         }
 
-        return resultado;
+        return Optional.empty();
     }
 
-    public List<Vagao> buscarPorTrem(int tremId) {
-        List<Vagao> resultado = new ArrayList<>();
+    public List<Vagao> findAll() throws SQLException {
+        List<Vagao> vagoes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_VAGAO WHERE T_CCR_TREM_id_trem = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+                "FROM tb_mvp_vagao v " +
+                "WHERE v.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Vagao vagao = mapResultSetToVagao(rs);
+                vagoes.add(vagao);
+            }
+        }
+
+        return vagoes;
+    }
+
+    public Vagao update(Vagao vagao) throws SQLException {
+        String sql = "UPDATE tb_mvp_vagao SET numeracao = ?, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, vagao.getNumeracao());
+            stmt.setInt(2, vagao.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar vagão, nenhuma linha afetada.");
+            }
+        }
+
+        return vagao;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_vagao SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public List<Vagao> findByNumeracao(String numeracao) throws SQLException {
+        List<Vagao> vagoes = new ArrayList<>();
+
+        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+                "FROM tb_mvp_vagao v " +
+                "WHERE v.numeracao LIKE ? AND v.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, "%" + numeracao + "%");
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Vagao vagao = mapResultSetToVagao(rs);
+                    vagoes.add(vagao);
+                }
+            }
+        }
+
+        return vagoes;
+    }
+
+    public List<Vagao> findByTremId(Integer tremId) throws SQLException {
+        List<Vagao> vagoes = new ArrayList<>();
+
+        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+                "FROM tb_mvp_vagao v " +
+                "JOIN tb_mvp_trem_vagao tv ON v.id = tv.vagao_id " +
+                "WHERE tv.trem_id = ? AND v.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setInt(1, tremId);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Vagao vagao = mapResultSetToEntity(rs);
-                    resultado.add(vagao);
-                    storage.put(vagao.getId(), vagao);
+                    Vagao vagao = mapResultSetToVagao(rs);
+                    vagoes.add(vagao);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar vagões por trem", e);
         }
 
-        return resultado;
+        return vagoes;
+    }
+
+    private Vagao mapResultSetToVagao(ResultSet rs) throws SQLException {
+        Vagao vagao = new Vagao();
+        vagao.setId(rs.getInt("id"));
+        vagao.setNumeracao(rs.getString("numeracao"));
+
+        vagao.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        vagao.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
+
+        return vagao;
     }
 }

@@ -1,403 +1,263 @@
 package br.com.ccr.repositories;
 
+import br.com.ccr.entities.Usuario;
+import br.com.ccr.entities.Endereco;
 import br.com.ccr.entities.Cargo;
 import br.com.ccr.entities.Setor;
-import br.com.ccr.entities.Usuario;
 import br.com.ccr.infrastructure.DatabaseConfig;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
-public class UsuarioRepository extends CrudRepositoryImpl<Usuario> {
-
-    private static final Logger log = LogManager.getLogger(UsuarioRepository.class);
+public class UsuarioRepository {
 
     @Inject
     private EnderecoRepository enderecoRepository;
 
-    @Inject
-    private CargoRepository cargoRepository;
-
-    @Inject
-    private SetorRepository setorRepository;
-
-    public UsuarioRepository(EnderecoRepository enderecoRepository, CargoRepository cargoRepository, SetorRepository setorRepository) {
-        this.enderecoRepository = enderecoRepository;
-        this.cargoRepository = cargoRepository;
-        this.setorRepository = setorRepository;
-    }
-
     public UsuarioRepository() {
-        this.enderecoRepository = null;
-        this.cargoRepository = new CargoRepository();
-        this.setorRepository = new SetorRepository();
     }
 
-    @Override
-    protected String getTableName() {
-        return "T_CCR_USUARIO";
-    }
-
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_USUARIO(nm_usuario, cpf_usuario, email_usuario, senha_usuario, telefone_usuario, " +
-                "T_CCR_ENDERECO_id_endereco, T_CCR_CARGO_TIPO_id, T_CCR_SETOR_id, dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    }
-
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_USUARIO SET nm_usuario = ?, cpf_usuario = ?, email_usuario = ?, senha_usuario = ?, " +
-                "telefone_usuario = ?, T_CCR_ENDERECO_id_endereco = ?, T_CCR_CARGO_TIPO_id = ?, T_CCR_SETOR_id = ?, " +
-                "dt_atualizacao = ?, dt_exclusao = ? WHERE id_usuario = ?";
-    }
-
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_USUARIO WHERE id_usuario = ? AND dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_USUARIO WHERE dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_USUARIO SET dt_exclusao = ? WHERE id_usuario = ?";
-    }
-
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Usuario usuario) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, usuario.getNome());
-        stmt.setString(index++, usuario.getCpf());
-        stmt.setString(index++, usuario.getEmail());
-        stmt.setString(index++, usuario.getSenha());
-        stmt.setString(index++, usuario.getTelefone());
-
+    public Usuario save(Usuario usuario) throws SQLException {
         if (usuario.getEndereco() != null) {
-            stmt.setInt(index++, usuario.getEndereco().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
+            if (usuario.getEndereco().getId() == null) {
+                Endereco savedEndereco = enderecoRepository.save(usuario.getEndereco());
+                usuario.setEndereco(savedEndereco);
+            }
         }
 
-        if (usuario.getCargo() != null) {
-            int cargoId = cargoRepository.getCargoId(usuario.getCargo());
-            stmt.setInt(index++, cargoId);
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+        String sql = "INSERT INTO tb_mvp_usuario (nome, cpf, email, senha, telefone, endereco_id, cargo, setor, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-        if (usuario.getSetor() != null) {
-            int setorId = setorRepository.getSetorId(usuario.getSetor());
-            stmt.setInt(index++, setorId);
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-        LocalDateTime now = LocalDateTime.now();
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, usuario.getUpdatedAt() != null ?
-                Timestamp.valueOf(usuario.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, usuario.getDeletedAt() != null ?
-                Timestamp.valueOf(usuario.getDeletedAt()) : null);
-    }
+            stmt.setString(1, usuario.getNome());
+            stmt.setString(2, usuario.getCpf());
+            stmt.setString(3, usuario.getEmail());
+            stmt.setString(4, usuario.getSenha());
+            stmt.setString(5, usuario.getTelefone());
 
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Usuario usuario) throws SQLException {
-        usuario.setUpdatedAt(LocalDateTime.now());
+            if (usuario.getEndereco() != null) {
+                stmt.setInt(6, usuario.getEndereco().getId());
+            } else {
+                stmt.setNull(6, Types.INTEGER);
+            }
 
-        int index = 1;
-        stmt.setString(index++, usuario.getNome());
-        stmt.setString(index++, usuario.getCpf());
-        stmt.setString(index++, usuario.getEmail());
-        stmt.setString(index++, usuario.getSenha());
-        stmt.setString(index++, usuario.getTelefone());
+            stmt.setString(7, usuario.getCargo().name());
+            stmt.setString(8, usuario.getSetor().name());
 
-        if (usuario.getEndereco() != null) {
-            stmt.setInt(index++, usuario.getEndereco().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+            int affectedRows = stmt.executeUpdate();
 
-        if (usuario.getCargo() != null) {
-            stmt.setInt(index++, cargoRepository.getCargoId(usuario.getCargo()));
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar usuário, nenhuma linha afetada.");
+            }
 
-        if (usuario.getSetor() != null) {
-            stmt.setInt(index++, setorRepository.getSetorId(usuario.getSetor()));
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        stmt.setTimestamp(index++, Timestamp.valueOf(usuario.getUpdatedAt()));
-        stmt.setTimestamp(index++, usuario.getDeletedAt() != null ?
-                Timestamp.valueOf(usuario.getDeletedAt()) : null);
-
-        stmt.setInt(index++, usuario.getId());
-    }
-
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 11;
-    }
-
-    @Override
-    protected Usuario mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Usuario usuario = new Usuario();
-        usuario.setId(rs.getInt("id_usuario"));
-        usuario.setNome(rs.getString("nm_usuario"));
-        usuario.setCpf(rs.getString("cpf_usuario"));
-        usuario.setEmail(rs.getString("email_usuario"));
-        usuario.setSenha(rs.getString("senha_usuario"));
-        usuario.setTelefone(rs.getString("telefone_usuario"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-
-        if (createdAt != null) {
-            usuario.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        if (updatedAt != null) {
-            usuario.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            usuario.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int enderecoId = rs.getInt("T_CCR_ENDERECO_id_endereco");
-        if (!rs.wasNull() && enderecoRepository != null) {
-            enderecoRepository.buscarPorId(enderecoId)
-                    .ifPresent(usuario::setEndereco);
-        }
-
-        int cargoId = rs.getInt("T_CCR_CARGO_TIPO_id");
-        if (!rs.wasNull()) {
-            Cargo cargo = cargoRepository.getCargoById(cargoId);
-            usuario.setCargo(cargo);
-        }
-
-        int setorId = rs.getInt("T_CCR_SETOR_id");
-        if (!rs.wasNull() && setorRepository != null) {
-            Setor setor = setorRepository.getSetorById(setorId);
-            usuario.setSetor(setor);
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    usuario.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar usuário, nenhum ID obtido.");
+                }
+            }
         }
 
         return usuario;
     }
 
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
+    public Optional<Usuario> findById(Integer id) throws SQLException {
+        String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
+                "u.endereco_id, u.cargo, u.setor " +
+                "FROM tb_mvp_usuario u " +
+                "WHERE u.id = ? AND u.deleted_at IS NULL";
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            int result = stmt.executeUpdate();
+            stmt.setInt(1, id);
 
-            if (result > 0) {
-                Optional<Usuario> usuario = buscarPorId(id);
-                usuario.ifPresent(u -> {
-                    u.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, u);
-                });
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao remover usuário", e);
-        }
-    }
-
-    // métodos adicionais para usuário
-
-    public Optional<Usuario> buscarPorCpf(String cpf) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_USUARIO WHERE cpf_usuario = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, cpf);
-
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    Usuario usuario = mapResultSetToEntity(rs);
-                    storage.put(usuario.getId(), usuario);
+                    Usuario usuario = mapResultSetToUsuario(rs);
                     return Optional.of(usuario);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar usuário por CPF", e);
         }
 
         return Optional.empty();
     }
 
-    public Optional<Usuario> buscarPorEmail(String email) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_USUARIO WHERE email_usuario = ? AND dt_exclusao IS NULL")) {
+    public List<Usuario> findAll() throws SQLException {
+        List<Usuario> usuarios = new ArrayList<>();
+
+        String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
+                "u.endereco_id, u.cargo, u.setor " +
+                "FROM tb_mvp_usuario u " +
+                "WHERE u.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Usuario usuario = mapResultSetToUsuario(rs);
+                usuarios.add(usuario);
+            }
+        }
+
+        return usuarios;
+    }
+
+    public Usuario update(Usuario usuario) throws SQLException {
+        if (usuario.getEndereco() != null) {
+            enderecoRepository.update(usuario.getEndereco());
+        }
+
+        String sql = "UPDATE tb_mvp_usuario SET nome = ?, cpf = ?, email = ?, " +
+                "senha = ?, telefone = ?, endereco_id = ?, cargo = ?, setor = ?, " +
+                "updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, usuario.getNome());
+            stmt.setString(2, usuario.getCpf());
+            stmt.setString(3, usuario.getEmail());
+            stmt.setString(4, usuario.getSenha());
+            stmt.setString(5, usuario.getTelefone());
+
+            if (usuario.getEndereco() != null) {
+                stmt.setInt(6, usuario.getEndereco().getId());
+            } else {
+                stmt.setNull(6, Types.INTEGER);
+            }
+
+            stmt.setString(7, usuario.getCargo().name());
+            stmt.setString(8, usuario.getSetor().name());
+            stmt.setInt(9, usuario.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar usuário, nenhuma linha afetada.");
+            }
+        }
+
+        return usuario;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_usuario SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public Optional<Usuario> findByEmail(String email) throws SQLException {
+        String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
+                "u.endereco_id, u.cargo, u.setor " +
+                "FROM tb_mvp_usuario u " +
+                "WHERE u.email = ? AND u.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setString(1, email);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    Usuario usuario = mapResultSetToEntity(rs);
-                    storage.put(usuario.getId(), usuario);
+                    Usuario usuario = mapResultSetToUsuario(rs);
                     return Optional.of(usuario);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar usuário por email", e);
         }
 
         return Optional.empty();
     }
 
-    public List<Usuario> buscarPorNome(String nome) {
-        List<Usuario> resultado = new ArrayList<>();
+    public Optional<Usuario> findByCpf(String cpf) throws SQLException {
+        String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
+                "u.endereco_id, u.cargo, u.setor " +
+                "FROM tb_mvp_usuario u " +
+                "WHERE u.cpf = ? AND u.deleted_at IS NULL";
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_USUARIO WHERE nm_usuario LIKE ? AND dt_exclusao IS NULL")) {
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            stmt.setString(1, "%" + nome + "%");
+            stmt.setString(1, cpf);
 
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Usuario usuario = mapResultSetToEntity(rs);
-                    resultado.add(usuario);
-                    storage.put(usuario.getId(), usuario);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Usuario usuario = mapResultSetToUsuario(rs);
+                    return Optional.of(usuario);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar usuários por nome", e);
         }
 
-        return resultado;
+        return Optional.empty();
     }
 
-    public List<Usuario> buscarPorCargo(Cargo cargo) {
-        List<Usuario> resultado = new ArrayList<>();
+    private Usuario mapResultSetToUsuario(ResultSet rs) throws SQLException {
+        Usuario usuario = new Usuario();
+        usuario.setId(rs.getInt("id"));
+        usuario.setNome(rs.getString("nome"));
+        usuario.setCpf(rs.getString("cpf"));
+        usuario.setEmail(rs.getString("email"));
+        usuario.setSenha(rs.getString("senha"));
+        usuario.setTelefone(rs.getString("telefone"));
 
-        int cargoId = cargoRepository.getCargoId(cargo);
-        if (cargoId == -1) {
-            return resultado;
+        Integer enderecoId = rs.getInt("endereco_id");
+        if (!rs.wasNull()) {
+            Optional<Endereco> endereco = enderecoRepository.findById(enderecoId);
+            endereco.ifPresent(usuario::setEndereco);
         }
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_USUARIO WHERE T_CCR_CARGO_TIPO_id = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setInt(1, cargoId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Usuario usuario = mapResultSetToEntity(rs);
-                    resultado.add(usuario);
-                    storage.put(usuario.getId(), usuario);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar usuários por cargo", e);
+        String cargoStr = rs.getString("cargo");
+        if (cargoStr != null && !cargoStr.isEmpty()) {
+            usuario.setCargo(Cargo.valueOf(cargoStr));
         }
 
-        return resultado;
+        String setorStr = rs.getString("setor");
+        if (setorStr != null && !setorStr.isEmpty()) {
+            usuario.setSetor(Setor.valueOf(setorStr));
+        }
+
+        return usuario;
     }
 
-    public List<Usuario> buscarPorSetor(Setor setor) {
-        List<Usuario> resultado = new ArrayList<>();
 
-        int setorId = setorRepository.getSetorId(setor);
-        if (setorId == -1) {
-            return resultado;
-        }
+    public Optional<Usuario> autenticar(String email, String senha) throws SQLException {
+        String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
+                "u.endereco_id, u.cargo, u.setor " +
+                "FROM tb_mvp_usuario u " +
+                "WHERE u.email = ? AND u.senha = ? AND u.deleted_at IS NULL";
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_USUARIO WHERE T_CCR_SETOR_id = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setInt(1, setorId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Usuario usuario = mapResultSetToEntity(rs);
-                    resultado.add(usuario);
-                    storage.put(usuario.getId(), usuario);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar usuários por setor", e);
-        }
-
-        return resultado;
-    }
-
-    public Optional<Usuario> autenticar(String email, String senha) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_USUARIO WHERE email_usuario = ? AND senha_usuario = ? AND dt_exclusao IS NULL")) {
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setString(1, email);
             stmt.setString(2, senha);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    Usuario usuario = mapResultSetToEntity(rs);
-                    storage.put(usuario.getId(), usuario);
+                    Usuario usuario = mapResultSetToUsuario(rs);
                     return Optional.of(usuario);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao autenticar usuário", e);
         }
 
         return Optional.empty();
     }
 
-    public boolean alterarSenha(int usuarioId, String senhaAtual, String novaSenha) {
-        Optional<Usuario> usuarioOpt = buscarPorId(usuarioId);
-
-        if (usuarioOpt.isPresent()) {
-            Usuario usuario = usuarioOpt.get();
-
-            if (usuario.getSenha().equals(senhaAtual)) {
-                try (var connection = DatabaseConfig.getConnection();
-                     var stmt = connection.prepareStatement(
-                             "UPDATE T_CCR_USUARIO SET senha_usuario = ?, dt_atualizacao = ? WHERE id_usuario = ?")) {
-
-                    stmt.setString(1, novaSenha);
-                    stmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
-                    stmt.setInt(3, usuarioId);
-
-                    int result = stmt.executeUpdate();
-
-                    if (result > 0) {
-                        usuario.setSenha(novaSenha);
-                        usuario.setUpdatedAt(LocalDateTime.now());
-                        storage.put(usuarioId, usuario);
-                        return true;
-                    }
-                } catch (SQLException e) {
-                    log.error("Erro ao alterar senha do usuário", e);
-                }
-            }
-        }
-
-        return false;
-    }
 }

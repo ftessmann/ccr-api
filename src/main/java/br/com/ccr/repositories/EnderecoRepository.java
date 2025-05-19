@@ -2,201 +2,190 @@ package br.com.ccr.repositories;
 
 import br.com.ccr.entities.Endereco;
 import br.com.ccr.infrastructure.DatabaseConfig;
-
 import jakarta.enterprise.context.ApplicationScoped;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
-public class EnderecoRepository extends CrudRepositoryImpl<Endereco> {
+public class EnderecoRepository {
 
-    private static final Logger log = LogManager.getLogger(EnderecoRepository.class);
+    public Endereco save(Endereco endereco) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_endereco (cep, rua, numero, bairro, cidade, estado, complemento, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-    public EnderecoRepository() {}
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-    @Override
-    protected String getTableName() {
-        return "T_CCR_ENDERECO";
-    }
+            stmt.setString(1, endereco.getCep());
+            stmt.setString(2, endereco.getRua());
+            stmt.setString(3, endereco.getNumero());
+            stmt.setString(4, endereco.getBairro());
+            stmt.setString(5, endereco.getCidade());
+            stmt.setString(6, endereco.getEstado());
+            stmt.setString(7, endereco.getComplemento());
 
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_ENDERECO(cep, nm_rua, nr_endereco, nm_bairro, nm_cidade, nm_estado, complemento, " +
-                "dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    }
+            int affectedRows = stmt.executeUpdate();
 
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_ENDERECO SET cep = ?, nm_rua = ?, nr_endereco = ?, nm_bairro = ?, nm_cidade = ?, " +
-                "nm_estado = ?, complemento = ?, dt_atualizacao = ?, dt_exclusao = ? WHERE id_endereco = ?";
-    }
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar endereço, nenhuma linha afetada.");
+            }
 
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_ENDERECO WHERE id_endereco = ? AND dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_ENDERECO WHERE dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_ENDERECO SET dt_exclusao = ? WHERE id_endereco = ?";
-    }
-
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Endereco endereco) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, endereco.getCep());
-        stmt.setString(index++, endereco.getRua());
-        stmt.setString(index++, endereco.getNumero());
-        stmt.setString(index++, endereco.getBairro());
-        stmt.setString(index++, endereco.getCidade());
-        stmt.setString(index++, endereco.getEstado());
-        stmt.setString(index++, endereco.getComplemento());
-
-        LocalDateTime now = LocalDateTime.now();
-        endereco.setCreatedAt(now);
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, endereco.getUpdatedAt() != null ?
-                Timestamp.valueOf(endereco.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, endereco.getDeletedAt() != null ?
-                Timestamp.valueOf(endereco.getDeletedAt()) : null);
-    }
-
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Endereco endereco) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, endereco.getCep());
-        stmt.setString(index++, endereco.getRua());
-        stmt.setString(index++, endereco.getNumero());
-        stmt.setString(index++, endereco.getBairro());
-        stmt.setString(index++, endereco.getCidade());
-        stmt.setString(index++, endereco.getEstado());
-        stmt.setString(index++, endereco.getComplemento());
-
-        LocalDateTime now = LocalDateTime.now();
-        endereco.setUpdatedAt(now);
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, endereco.getDeletedAt() != null ?
-                Timestamp.valueOf(endereco.getDeletedAt()) : null);
-
-        stmt.setInt(index++, endereco.getId());
-    }
-
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 10;
-    }
-
-    @Override
-    protected Endereco mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Endereco endereco = new Endereco();
-        endereco.setId(rs.getInt("id_endereco"));
-        endereco.setCep(rs.getString("cep"));
-        endereco.setRua(rs.getString("nm_rua"));
-        endereco.setNumero(rs.getString("nr_endereco"));
-        endereco.setBairro(rs.getString("nm_bairro"));
-        endereco.setCidade(rs.getString("nm_cidade"));
-        endereco.setEstado(rs.getString("nm_estado"));
-        endereco.setComplemento(rs.getString("complemento"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-
-        if (createdAt != null) {
-            endereco.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        if (updatedAt != null) {
-            endereco.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            endereco.setDeletedAt(deletedAt.toLocalDateTime());
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    endereco.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar endereço, nenhum ID obtido.");
+                }
+            }
         }
 
         return endereco;
     }
 
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
+    public Optional<Endereco> findById(Integer id) throws SQLException {
+        String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
+                "e.complemento " +
+                "FROM tb_mvp_endereco e " +
+                "WHERE e.id = ? AND e.deleted_at IS NULL";
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            int result = stmt.executeUpdate();
+            stmt.setInt(1, id);
 
-            if (result > 0) {
-                Optional<Endereco> endereco = buscarPorId(id);
-                endereco.ifPresent(e -> {
-                    e.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, e);
-                });
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao remover endereço", e);
-        }
-    }
-
-    // metodos adicionais para endereco
-
-    public List<Endereco> buscarPorCep(String cep) {
-        List<Endereco> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_ENDERECO WHERE cep = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, cep);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Endereco endereco = mapResultSetToEntity(rs);
-                    resultado.add(endereco);
-                    storage.put(endereco.getId(), endereco);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Endereco endereco = mapResultSetToEndereco(rs);
+                    return Optional.of(endereco);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar endereços por CEP", e);
         }
 
-        return resultado;
+        return Optional.empty();
     }
 
-    public List<Endereco> buscarPorCidade(String cidade) {
-        List<Endereco> resultado = new ArrayList<>();
+    public List<Endereco> findAll() throws SQLException {
+        List<Endereco> enderecos = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_ENDERECO WHERE nm_cidade LIKE ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
+                "e.complemento " +
+                "FROM tb_mvp_endereco e " +
+                "WHERE e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Endereco endereco = mapResultSetToEndereco(rs);
+                enderecos.add(endereco);
+            }
+        }
+
+        return enderecos;
+    }
+
+    public Endereco update(Endereco endereco) throws SQLException {
+        String sql = "UPDATE tb_mvp_endereco SET cep = ?, rua = ?, numero = ?, " +
+                "bairro = ?, cidade = ?, estado = ?, complemento = ?, " +
+                "updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, endereco.getCep());
+            stmt.setString(2, endereco.getRua());
+            stmt.setString(3, endereco.getNumero());
+            stmt.setString(4, endereco.getBairro());
+            stmt.setString(5, endereco.getCidade());
+            stmt.setString(6, endereco.getEstado());
+            stmt.setString(7, endereco.getComplemento());
+            stmt.setInt(8, endereco.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar endereço, nenhuma linha afetada.");
+            }
+        }
+
+        return endereco;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_endereco SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public List<Endereco> findByCidade(String cidade) throws SQLException {
+        List<Endereco> enderecos = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
+                "e.complemento " +
+                "FROM tb_mvp_endereco e " +
+                "WHERE e.cidade LIKE ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setString(1, "%" + cidade + "%");
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Endereco endereco = mapResultSetToEntity(rs);
-                    resultado.add(endereco);
-                    storage.put(endereco.getId(), endereco);
+                    Endereco endereco = mapResultSetToEndereco(rs);
+                    enderecos.add(endereco);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar endereços por cidade", e);
         }
 
-        return resultado;
+        return enderecos;
+    }
+
+    public Optional<Endereco> findByCep(String cep) throws SQLException {
+        String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
+                "e.complemento " +
+                "FROM tb_mvp_endereco e " +
+                "WHERE e.cep = ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, cep);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Endereco endereco = mapResultSetToEndereco(rs);
+                    return Optional.of(endereco);
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Endereco mapResultSetToEndereco(ResultSet rs) throws SQLException {
+        Endereco endereco = new Endereco();
+        endereco.setId(rs.getInt("id"));
+        endereco.setCep(rs.getString("cep"));
+        endereco.setRua(rs.getString("rua"));
+        endereco.setNumero(rs.getString("numero"));
+        endereco.setBairro(rs.getString("bairro"));
+        endereco.setCidade(rs.getString("cidade"));
+        endereco.setEstado(rs.getString("estado"));
+        endereco.setComplemento(rs.getString("complemento"));
+
+        return endereco;
     }
 }

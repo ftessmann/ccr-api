@@ -1,380 +1,419 @@
 package br.com.ccr.repositories;
 
+import br.com.ccr.entities.Estacao;
+import br.com.ccr.entities.Linha;
 import br.com.ccr.entities.Trem;
 import br.com.ccr.entities.Usuario;
 import br.com.ccr.entities.Vagao;
 import br.com.ccr.infrastructure.DatabaseConfig;
-
 import jakarta.enterprise.context.ApplicationScoped;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import jakarta.inject.Inject;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
-public class TremRepository extends CrudRepositoryImpl<Trem> {
+public class TremRepository {
 
-    private static final Logger log = LogManager.getLogger(TremRepository.class);
-
-    private LinhaRepository linhaRepository;
+    @Inject
     private EstacaoRepository estacaoRepository;
+
+    @Inject
+    private LinhaRepository linhaRepository;
+
+    @Inject
     private UsuarioRepository usuarioRepository;
+
+    @Inject
     private VagaoRepository vagaoRepository;
 
     public TremRepository() {
     }
 
-    public TremRepository(
-            LinhaRepository linhaRepository,
-            EstacaoRepository estacaoRepository,
-            UsuarioRepository usuarioRepository,
-            VagaoRepository vagaoRepository
-    ) {
-        this.linhaRepository = linhaRepository;
-        this.estacaoRepository = estacaoRepository;
-        this.usuarioRepository = usuarioRepository;
-        this.vagaoRepository = vagaoRepository;
-    }
+    public Trem save(Trem trem) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_trem (modelo, estacao_inicial_id, estacao_final_id, linha_id, created_at) " +
+                "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-    public TremRepository(LinhaRepository linhaRepository, EstacaoRepository estacaoRepository) {
-        this.linhaRepository = linhaRepository;
-        this.estacaoRepository = estacaoRepository;
-        this.usuarioRepository = null;
-        this.vagaoRepository = null;
-    }
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-    @Override
-    protected String getTableName() {
-        return "T_CCR_TREM";
-    }
+            stmt.setString(1, trem.getModelo());
 
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_TREM(modelo, T_CCR_LINHA_id_linha, estacao_inicial_id, estacao_final_id, " +
-                "dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
-    }
+            if (trem.getEstacaoInicial() != null) {
+                stmt.setInt(2, trem.getEstacaoInicial().getId());
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
 
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_TREM SET modelo = ?, T_CCR_LINHA_id_linha = ?, estacao_inicial_id = ?, " +
-                "estacao_final_id = ?, dt_atualizacao = ?, dt_exclusao = ? WHERE id_trem = ?";
-    }
+            if (trem.getEstacaoFinal() != null) {
+                stmt.setInt(3, trem.getEstacaoFinal().getId());
+            } else {
+                stmt.setNull(3, Types.INTEGER);
+            }
 
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_TREM WHERE id_trem = ? AND dt_exclusao IS NULL";
-    }
+            if (trem.getLinha() != null) {
+                stmt.setInt(4, trem.getLinha().getId());
+            } else {
+                stmt.setNull(4, Types.INTEGER);
+            }
 
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_TREM WHERE dt_exclusao IS NULL";
-    }
+            int affectedRows = stmt.executeUpdate();
 
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_TREM SET dt_exclusao = ? WHERE id_trem = ?";
-    }
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar trem, nenhuma linha afetada.");
+            }
 
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Trem trem) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, trem.getModelo());
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    trem.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar trem, nenhum ID obtido.");
+                }
+            }
 
-        if (trem.getLinha() != null) {
-            stmt.setInt(index++, trem.getLinha().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+            if (trem.getCondutores() != null && !trem.getCondutores().isEmpty()) {
+                saveTremCondutorRelations(trem.getId(), trem.getCondutores());
+            }
 
-        if (trem.getEstacaoInicial() != null) {
-            stmt.setInt(index++, trem.getEstacaoInicial().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (trem.getEstacaoFinal() != null) {
-            stmt.setInt(index++, trem.getEstacaoFinal().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        trem.setCreatedAt(now);
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, trem.getUpdatedAt() != null ?
-                Timestamp.valueOf(trem.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, trem.getDeletedAt() != null ?
-                Timestamp.valueOf(trem.getDeletedAt()) : null);
-    }
-
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Trem trem) throws SQLException {
-
-        LocalDateTime now = LocalDateTime.now();
-        trem.setUpdatedAt(now);
-
-        int index = 1;
-        stmt.setString(index++, trem.getModelo());
-
-        if (trem.getLinha() != null) {
-            stmt.setInt(index++, trem.getLinha().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (trem.getEstacaoInicial() != null) {
-            stmt.setInt(index++, trem.getEstacaoInicial().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (trem.getEstacaoFinal() != null) {
-            stmt.setInt(index++, trem.getEstacaoFinal().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, trem.getDeletedAt() != null ?
-                Timestamp.valueOf(trem.getDeletedAt()) : null);
-
-        stmt.setInt(index++, trem.getId());
-    }
-
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 7;
-    }
-
-    @Override
-    protected Trem mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Trem trem = new Trem();
-        trem.setId(rs.getInt("id_trem"));
-        trem.setModelo(rs.getString("modelo"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-
-        if (createdAt != null) {
-            trem.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        if (updatedAt != null) {
-            trem.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            trem.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int linhaId = rs.getInt("T_CCR_LINHA_id_linha");
-        if (!rs.wasNull() && linhaRepository != null) {
-            linhaRepository.buscarPorId(linhaId)
-                    .ifPresent(trem::setLinha);
-        }
-
-        int estacaoInicialId = rs.getInt("estacao_inicial_id");
-        if (!rs.wasNull() && estacaoRepository != null) {
-            estacaoRepository.buscarPorId(estacaoInicialId)
-                    .ifPresent(trem::setEstacaoInicial);
-        }
-
-        int estacaoFinalId = rs.getInt("estacao_final_id");
-        if (!rs.wasNull() && estacaoRepository != null) {
-            estacaoRepository.buscarPorId(estacaoFinalId)
-                    .ifPresent(trem::setEstacaoFinal);
-        }
-
-        if (usuarioRepository != null) {
-            trem.setCondutores(carregarCondutores(trem.getId()));
-        } else {
-            trem.setCondutores(new ArrayList<>());
-        }
-
-        if (vagaoRepository != null) {
-            trem.setVagoes(carregarVagoes(trem.getId()));
-        } else {
-            trem.setVagoes(new ArrayList<>());
+            if (trem.getVagoes() != null && !trem.getVagoes().isEmpty()) {
+                saveTremVagaoRelations(trem.getId(), trem.getVagoes());
+            }
         }
 
         return trem;
     }
 
-    // metodo pode gerar NullPointer caso não tenha condutores
-    public ArrayList<Usuario> carregarCondutores(int tremId) {
+    public Optional<Trem> findById(Integer id) throws SQLException {
+        String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
+                "FROM tb_mvp_trem t " +
+                "WHERE t.id = ? AND t.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Trem trem = mapResultSetToTrem(rs);
+
+                    trem.setCondutores(findCondutoresByTremId(trem.getId()));
+
+                    trem.setVagoes(findVagoesByTremId(trem.getId()));
+
+                    return Optional.of(trem);
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    public List<Trem> findAll() throws SQLException {
+        List<Trem> trens = new ArrayList<>();
+
+        String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
+                "FROM tb_mvp_trem t " +
+                "WHERE t.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Trem trem = mapResultSetToTrem(rs);
+
+                trem.setCondutores(findCondutoresByTremId(trem.getId()));
+
+                trem.setVagoes(findVagoesByTremId(trem.getId()));
+
+                trens.add(trem);
+            }
+        }
+
+        return trens;
+    }
+
+    public Trem update(Trem trem) throws SQLException {
+        String sql = "UPDATE tb_mvp_trem SET modelo = ?, estacao_inicial_id = ?, estacao_final_id = ?, " +
+                "linha_id = ?, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, trem.getModelo());
+
+            if (trem.getEstacaoInicial() != null) {
+                stmt.setInt(2, trem.getEstacaoInicial().getId());
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
+
+            if (trem.getEstacaoFinal() != null) {
+                stmt.setInt(3, trem.getEstacaoFinal().getId());
+            } else {
+                stmt.setNull(3, Types.INTEGER);
+            }
+
+            if (trem.getLinha() != null) {
+                stmt.setInt(4, trem.getLinha().getId());
+            } else {
+                stmt.setNull(4, Types.INTEGER);
+            }
+
+            stmt.setInt(5, trem.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar trem, nenhuma linha afetada.");
+            }
+
+            if (trem.getCondutores() != null) {
+                deleteTremCondutorRelations(trem.getId());
+                saveTremCondutorRelations(trem.getId(), trem.getCondutores());
+            }
+
+            if (trem.getVagoes() != null) {
+                deleteTremVagaoRelations(trem.getId());
+                saveTremVagaoRelations(trem.getId(), trem.getVagoes());
+            }
+        }
+
+        return trem;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_trem SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public List<Trem> findByLinhaId(Integer linhaId) throws SQLException {
+        List<Trem> trens = new ArrayList<>();
+
+        String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
+                "FROM tb_mvp_trem t " +
+                "WHERE t.linha_id = ? AND t.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, linhaId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Trem trem = mapResultSetToTrem(rs);
+
+                    trem.setCondutores(findCondutoresByTremId(trem.getId()));
+
+                    trem.setVagoes(findVagoesByTremId(trem.getId()));
+
+                    trens.add(trem);
+                }
+            }
+        }
+
+        return trens;
+    }
+
+    public List<Trem> findByEstacaoId(Integer estacaoId) throws SQLException {
+        List<Trem> trens = new ArrayList<>();
+
+        String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
+                "FROM tb_mvp_trem t " +
+                "WHERE (t.estacao_inicial_id = ? OR t.estacao_final_id = ?) AND t.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, estacaoId);
+            stmt.setInt(2, estacaoId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Trem trem = mapResultSetToTrem(rs);
+
+                    trem.setCondutores(findCondutoresByTremId(trem.getId()));
+
+                    trem.setVagoes(findVagoesByTremId(trem.getId()));
+
+                    trens.add(trem);
+                }
+            }
+        }
+
+        return trens;
+    }
+
+    public List<Trem> findByCondutorId(Integer condutorId) throws SQLException {
+        List<Trem> trens = new ArrayList<>();
+
+        String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
+                "FROM tb_mvp_trem t " +
+                "JOIN tb_mvp_trem_condutor tc ON t.id = tc.trem_id " +
+                "WHERE tc.usuario_id = ? AND t.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, condutorId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Trem trem = mapResultSetToTrem(rs);
+
+                    trem.setCondutores(findCondutoresByTremId(trem.getId()));
+
+                    trem.setVagoes(findVagoesByTremId(trem.getId()));
+
+                    trens.add(trem);
+                }
+            }
+        }
+
+        return trens;
+    }
+
+    private ArrayList<Usuario> findCondutoresByTremId(Integer tremId) throws SQLException {
         ArrayList<Usuario> condutores = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT T_CCR_USUARIO_id FROM T_CCR_TREM_CONDUTOR " +
-                             "WHERE T_CCR_TREM_id = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT u.id " +
+                "FROM tb_mvp_usuario u " +
+                "JOIN tb_mvp_trem_condutor tc ON u.id = tc.usuario_id " +
+                "WHERE tc.trem_id = ? AND u.deleted_at IS NULL " +
+                "ORDER BY u.id";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setInt(1, tremId);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    int usuarioId = rs.getInt("T_CCR_USUARIO_id");
-                    usuarioRepository.buscarPorId(usuarioId)
-                            .ifPresent(condutores::add);
+                    int condutorId = rs.getInt("id");
+                    Optional<Usuario> condutorOpt = usuarioRepository.findById(condutorId);
+                    condutorOpt.ifPresent(condutores::add);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao carregar condutores do trem", e);
         }
 
         return condutores;
     }
 
-    // metodo pode gerar NullPointer caso não tenha vagoes
-    public ArrayList<Vagao> carregarVagoes(int tremId) {
+    private ArrayList<Vagao> findVagoesByTremId(Integer tremId) throws SQLException {
         ArrayList<Vagao> vagoes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_VAGAO WHERE T_CCR_TREM_id_trem = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT v.id " +
+                "FROM tb_mvp_vagao v " +
+                "JOIN tb_mvp_trem_vagao tv ON v.id = tv.vagao_id " +
+                "WHERE tv.trem_id = ? AND v.deleted_at IS NULL " +
+                "ORDER BY v.id";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setInt(1, tremId);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Vagao vagao = vagaoRepository.mapResultSetToEntity(rs);
-                    vagoes.add(vagao);
+                    int vagaoId = rs.getInt("id");
+                    Optional<Vagao> vagaoOpt = vagaoRepository.findById(vagaoId);
+                    vagaoOpt.ifPresent(vagoes::add);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao carregar vagões do trem", e);
         }
 
         return vagoes;
     }
 
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
+    private void saveTremCondutorRelations(Integer tremId, List<Usuario> condutores) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_trem_condutor (trem_id, usuario_id) VALUES (?, ?)";
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            int result = stmt.executeUpdate();
-
-            if (result > 0) {
-                Optional<Trem> trem = buscarPorId(id);
-                trem.ifPresent(t -> {
-                    t.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, t);
-                });
+            for (Usuario condutor : condutores) {
+                stmt.setInt(1, tremId);
+                stmt.setInt(2, condutor.getId());
+                stmt.addBatch();
             }
-        } catch (SQLException e) {
-            log.error("Erro ao remover trem", e);
+
+            stmt.executeBatch();
         }
     }
 
-    // metodos adicionais para trem
+    private void deleteTremCondutorRelations(Integer tremId) throws SQLException {
+        String sql = "DELETE FROM tb_mvp_trem_condutor WHERE trem_id = ?";
 
-    public List<Trem> buscarPorModelo(String modelo) {
-        List<Trem> resultado = new ArrayList<>();
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_TREM WHERE modelo LIKE ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, "%" + modelo + "%");
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Trem trem = mapResultSetToEntity(rs);
-                    resultado.add(trem);
-                    storage.put(trem.getId(), trem);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar trens por modelo", e);
-        }
-
-        return resultado;
-    }
-
-    public List<Trem> buscarPorLinha(int linhaId) {
-        List<Trem> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_TREM WHERE T_CCR_LINHA_id_linha = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setInt(1, linhaId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Trem trem = mapResultSetToEntity(rs);
-                    resultado.add(trem);
-                    storage.put(trem.getId(), trem);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar trens por linha", e);
-        }
-
-        return resultado;
-    }
-
-    public void adicionarCondutor(Trem trem, Usuario condutor) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "INSERT INTO T_CCR_TREM_CONDUTOR(T_CCR_TREM_id, T_CCR_USUARIO_id, dt_criacao) " +
-                             "VALUES (?, ?, ?)")) {
-
-            stmt.setInt(1, trem.getId());
-            stmt.setInt(2, condutor.getId());
-            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
+            stmt.setInt(1, tremId);
             stmt.executeUpdate();
-
-            if (trem.getCondutores() == null) {
-                trem.setCondutores(new ArrayList<>());
-            }
-            trem.getCondutores().add(condutor);
-
-        } catch (SQLException e) {
-            log.error("Erro ao adicionar condutor ao trem", e);
         }
     }
 
-    public void removerCondutor(Trem trem, Usuario condutor) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "UPDATE T_CCR_TREM_CONDUTOR SET dt_exclusao = ? " +
-                             "WHERE T_CCR_TREM_id = ? AND T_CCR_USUARIO_id = ? AND dt_exclusao IS NULL")) {
+    private void saveTremVagaoRelations(Integer tremId, List<Vagao> vagoes) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_trem_vagao (trem_id, vagao_id) VALUES (?, ?)";
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, trem.getId());
-            stmt.setInt(3, condutor.getId());
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            for (Vagao vagao : vagoes) {
+                stmt.setInt(1, tremId);
+                stmt.setInt(2, vagao.getId());
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+        }
+    }
+
+    private void deleteTremVagaoRelations(Integer tremId) throws SQLException {
+        String sql = "DELETE FROM tb_mvp_trem_vagao WHERE trem_id = ?";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, tremId);
             stmt.executeUpdate();
-
-            if (trem.getCondutores() != null) {
-                trem.getCondutores().removeIf(c -> c.getId() == condutor.getId());
-            }
-
-        } catch (SQLException e) {
-            log.error("Erro ao remover condutor do trem", e);
         }
     }
 
-    public void adicionarVagao(Trem trem, Vagao vagao) {
-        if (vagaoRepository != null) {
-            vagao.setTrem(trem);
-            vagaoRepository.salvar(vagao);
+    private Trem mapResultSetToTrem(ResultSet rs) throws SQLException {
+        Trem trem = new Trem();
+        trem.setId(rs.getInt("id"));
+        trem.setModelo(rs.getString("modelo"));
 
-            if (trem.getVagoes() == null) {
-                trem.setVagoes(new ArrayList<>());
-            }
-            trem.getVagoes().add(vagao);
+        Integer estacaoInicialId = rs.getInt("estacao_inicial_id");
+        if (!rs.wasNull()) {
+            Optional<Estacao> estacaoInicial = estacaoRepository.findById(estacaoInicialId);
+            estacaoInicial.ifPresent(trem::setEstacaoInicial);
         }
+
+        Integer estacaoFinalId = rs.getInt("estacao_final_id");
+        if (!rs.wasNull()) {
+            Optional<Estacao> estacaoFinal = estacaoRepository.findById(estacaoFinalId);
+            estacaoFinal.ifPresent(trem::setEstacaoFinal);
+        }
+
+        Integer linhaId = rs.getInt("linha_id");
+        if (!rs.wasNull()) {
+            Optional<Linha> linha = linhaRepository.findById(linhaId);
+            linha.ifPresent(trem::setLinha);
+        }
+
+        return trem;
     }
 }

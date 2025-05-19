@@ -1,5 +1,6 @@
 package br.com.ccr.entities;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -7,13 +8,16 @@ public class Equipe extends BaseModel {
     private String nome;
     private ArrayList<Usuario> integrantes;
     private Estacao base;
+    private Setor setor;
 
-    public Equipe() {}
+    public Equipe() {
+    }
 
-    public Equipe(String nome, ArrayList<Usuario> integrantes, Estacao base) {
+    public Equipe(String nome, ArrayList<Usuario> integrantes, Estacao base, Setor setor) {
         this.nome = nome;
         this.integrantes = integrantes;
         this.base = base;
+        this.setor = setor;
     }
 
     public String getNome() {
@@ -40,25 +44,11 @@ public class Equipe extends BaseModel {
         this.base = base;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        Equipe equipe = (Equipe) o;
-        return Objects.equals(nome, equipe.nome) && Objects.equals(integrantes, equipe.integrantes) && Objects.equals(base, equipe.base);
+    public Setor getSetor() {
+        return setor;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), nome, integrantes, base);
-    }
-
-    @Override
-    public String toString() {
-        return "Equipe{" +
-                "nome='" + nome + '\'' +
-                ", integrantes=" + integrantes +
-                ", base=" + base +
-                '}';
+    public void setSetor(Setor setor) {
+        this.setor = setor;
     }
 }

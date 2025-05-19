@@ -1,120 +1,105 @@
 package br.com.ccr.resources;
 
+import br.com.ccr.dtos.EnderecoDTO;
 import br.com.ccr.entities.Endereco;
+import br.com.ccr.mappers.EnderecoMapper;
 import br.com.ccr.repositories.EnderecoRepository;
-
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriBuilder;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Path("/enderecos")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class EnderecoResource {
 
-    private static final Logger log = LogManager.getLogger(EnderecoResource.class);
+    @Inject
+    private EnderecoRepository enderecoRepository;
 
     @Inject
-    EnderecoRepository enderecoRepository;
+    private EnderecoMapper enderecoMapper;
 
-    @GET
-    public Response listar(
-            @QueryParam("cep") String cep,
-            @QueryParam("cidade") String cidade
-    ) {
+    @POST
+    public Response createEndereco(EnderecoDTO enderecoDTO) {
         try {
-            List<Endereco> enderecos;
+            Endereco endereco = enderecoMapper.toEntity(enderecoDTO);
+            Endereco savedEndereco = enderecoRepository.save(endereco);
+            EnderecoDTO savedEnderecoDTO = enderecoMapper.toDTO(savedEndereco);
 
-            if (cep != null && !cep.isEmpty()) {
-                log.info("Buscando endereços por CEP: {}", cep);
-                enderecos = enderecoRepository.buscarPorCep(cep);
-            } else if (cidade != null && !cidade.isEmpty()) {
-                log.info("Buscando endereços por cidade: {}", cidade);
-                enderecos = enderecoRepository.buscarPorCidade(cidade);
-            } else {
-                log.info("Listando todos os endereços");
-                enderecos = enderecoRepository.listarTodos();
-            }
-
-            return Response.ok(enderecos).build();
-        } catch (Exception e) {
-            log.error("Erro ao listar endereços", e);
+            return Response.status(Response.Status.CREATED)
+                    .entity(savedEnderecoDTO)
+                    .build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao listar endereços: " + e.getMessage())
+                    .entity("Erro ao criar endereço: " + e.getMessage())
                     .build();
         }
     }
 
     @GET
     @Path("/{id}")
-    public Response buscarPorId(@PathParam("id") int id) {
+    public Response getEnderecoById(@PathParam("id") Integer id) {
         try {
-            log.info("Buscando endereço por ID: {}", id);
-            Optional<Endereco> endereco = enderecoRepository.buscarPorId(id);
+            Optional<Endereco> endereco = enderecoRepository.findById(id);
 
             if (endereco.isPresent()) {
-                return Response.ok(endereco.get()).build();
+                EnderecoDTO enderecoDTO = enderecoMapper.toDTO(endereco.get());
+                return Response.ok(enderecoDTO).build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Endereço não encontrado com ID: " + id)
+                        .entity("Endereço não encontrado")
                         .build();
             }
-        } catch (Exception e) {
-            log.error("Erro ao buscar endereço por ID", e);
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Erro ao buscar endereço: " + e.getMessage())
                     .build();
         }
     }
 
-    @POST
-    @Transactional
-    public Response adicionar(Endereco endereco) {
+    @GET
+    public Response getAllEnderecos() {
         try {
-            log.info("Adicionando novo endereço");
-            Endereco novoEndereco = enderecoRepository.salvar(endereco);
+            List<Endereco> enderecos = enderecoRepository.findAll();
+            List<EnderecoDTO> enderecoDTOs = enderecos.stream()
+                    .map(enderecoMapper::toDTO)
+                    .collect(Collectors.toList());
 
-            return Response.created(
-                            UriBuilder.fromResource(EnderecoResource.class)
-                                    .path(String.valueOf(novoEndereco.getId()))
-                                    .build())
-                    .entity(novoEndereco)
-                    .build();
-        } catch (Exception e) {
-            log.error("Erro ao adicionar endereço", e);
+            return Response.ok(enderecoDTOs).build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao adicionar endereço: " + e.getMessage())
+                    .entity("Erro ao buscar endereços: " + e.getMessage())
                     .build();
         }
     }
 
     @PUT
     @Path("/{id}")
-    @Transactional
-    public Response atualizar(@PathParam("id") int id, Endereco endereco) {
+    public Response updateEndereco(@PathParam("id") Integer id, EnderecoDTO enderecoDTO) {
         try {
-            log.info("Atualizando endereço com ID: {}", id);
-            Optional<Endereco> enderecoExistente = enderecoRepository.buscarPorId(id);
+            Optional<Endereco> existingEndereco = enderecoRepository.findById(id);
 
-            if (enderecoExistente.isPresent()) {
-                enderecoRepository.atualizar(id, endereco);
-                return Response.ok(endereco).build();
-            } else {
+            if (existingEndereco.isEmpty()) {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Endereço não encontrado com ID: " + id)
+                        .entity("Endereço não encontrado")
                         .build();
             }
-        } catch (Exception e) {
-            log.error("Erro ao atualizar endereço", e);
+
+            Endereco endereco = enderecoMapper.toEntity(enderecoDTO);
+            endereco.setId(id);
+
+            Endereco updatedEndereco = enderecoRepository.update(endereco);
+
+            EnderecoDTO updatedEnderecoDTO = enderecoMapper.toDTO(updatedEndereco);
+
+            return Response.ok(updatedEnderecoDTO).build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Erro ao atualizar endereço: " + e.getMessage())
                     .build();
@@ -123,24 +108,58 @@ public class EnderecoResource {
 
     @DELETE
     @Path("/{id}")
-    @Transactional
-    public Response remover(@PathParam("id") int id) {
+    public Response deleteEndereco(@PathParam("id") Integer id) {
         try {
-            log.info("Removendo endereço com ID: {}", id);
-            Optional<Endereco> endereco = enderecoRepository.buscarPorId(id);
+            boolean deleted = enderecoRepository.deleteById(id);
 
-            if (endereco.isPresent()) {
-                enderecoRepository.remover(id);
+            if (deleted) {
                 return Response.noContent().build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Endereço não encontrado com ID: " + id)
+                        .entity("Endereço não encontrado")
                         .build();
             }
-        } catch (Exception e) {
-            log.error("Erro ao remover endereço", e);
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao remover endereço: " + e.getMessage())
+                    .entity("Erro ao excluir endereço: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/cidade/{cidade}")
+    public Response getEnderecosByCidade(@PathParam("cidade") String cidade) {
+        try {
+            List<Endereco> enderecos = enderecoRepository.findByCidade(cidade);
+            List<EnderecoDTO> enderecoDTOs = enderecos.stream()
+                    .map(enderecoMapper::toDTO)
+                    .collect(Collectors.toList());
+
+            return Response.ok(enderecoDTOs).build();
+        } catch (SQLException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro ao buscar endereços por cidade: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/cep/{cep}")
+    public Response getEnderecoByCep(@PathParam("cep") String cep) {
+        try {
+            Optional<Endereco> endereco = enderecoRepository.findByCep(cep);
+
+            if (endereco.isPresent()) {
+                EnderecoDTO enderecoDTO = enderecoMapper.toDTO(endereco.get());
+                return Response.ok(enderecoDTO).build();
+            } else {
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity("Endereço não encontrado para o CEP informado")
+                        .build();
+            }
+        } catch (SQLException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro ao buscar endereço por CEP: " + e.getMessage())
                     .build();
         }
     }

@@ -69,7 +69,7 @@ public class EstacaoRepository {
     }
 
     public Optional<Estacao> findById(Integer id) throws SQLException {
-        String sql = "SELECT e.id, e.nome, e.endereco_id, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
                 "FROM tb_mvp_estacao e " +
                 "WHERE e.id = ? AND e.deleted_at IS NULL";
 
@@ -95,7 +95,7 @@ public class EstacaoRepository {
     public List<Estacao> findAll() throws SQLException {
         List<Estacao> estacoes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.endereco_id, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
                 "FROM tb_mvp_estacao e " +
                 "WHERE e.deleted_at IS NULL";
 
@@ -168,7 +168,7 @@ public class EstacaoRepository {
     public List<Estacao> findByNome(String nome) throws SQLException {
         List<Estacao> estacoes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.endereco_id, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
                 "FROM tb_mvp_estacao e " +
                 "WHERE e.nome LIKE ? AND e.deleted_at IS NULL";
 
@@ -194,7 +194,7 @@ public class EstacaoRepository {
     public List<Estacao> findByLinhaId(Integer linhaId) throws SQLException {
         List<Estacao> estacoes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.endereco_id, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
                 "FROM tb_mvp_estacao e " +
                 "JOIN tb_mvp_estacao_linha el ON e.id = el.estacao_id " +
                 "WHERE el.linha_id = ? AND e.deleted_at IS NULL";
@@ -208,7 +208,6 @@ public class EstacaoRepository {
                 while (rs.next()) {
                     Estacao estacao = mapResultSetToEstacao(rs);
 
-                    // Carregar as linhas relacionadas
                     estacao.setLinhas(findLinhasByEstacaoId(estacao.getId()));
 
                     estacoes.add(estacao);
@@ -282,9 +281,6 @@ public class EstacaoRepository {
             Optional<Endereco> endereco = enderecoRepository.findById(enderecoId);
             endereco.ifPresent(estacao::setEndereco);
         }
-
-        estacao.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        estacao.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return estacao;
     }

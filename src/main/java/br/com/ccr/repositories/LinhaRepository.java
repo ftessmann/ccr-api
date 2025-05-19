@@ -42,7 +42,6 @@ public class LinhaRepository {
                 }
             }
 
-            // Se houver estações, salvar as relações na tabela de junção
             if (linha.getEstacoes() != null && !linha.getEstacoes().isEmpty()) {
                 saveEstacaoLinhaRelations(linha.getId(), linha.getEstacoes());
             }
@@ -65,7 +64,6 @@ public class LinhaRepository {
                 if (rs.next()) {
                     Linha linha = mapResultSetToLinha(rs);
 
-                    // Carregar as estações relacionadas
                     linha.setEstacoes(findEstacoesByLinhaId(linha.getId()));
 
                     return Optional.of(linha);
@@ -79,7 +77,7 @@ public class LinhaRepository {
     public List<Linha> findAll() throws SQLException {
         List<Linha> linhas = new ArrayList<>();
 
-        String sql = "SELECT l.id, l.nome, l.created_at, l.updated_at " +
+        String sql = "SELECT l.id, l.nome " +
                 "FROM tb_mvp_linha l " +
                 "WHERE l.deleted_at IS NULL";
 
@@ -90,7 +88,6 @@ public class LinhaRepository {
             while (rs.next()) {
                 Linha linha = mapResultSetToLinha(rs);
 
-                // Carregar as estações relacionadas
                 linha.setEstacoes(findEstacoesByLinhaId(linha.getId()));
 
                 linhas.add(linha);
@@ -116,12 +113,9 @@ public class LinhaRepository {
                 throw new SQLException("Falha ao atualizar linha, nenhuma linha afetada.");
             }
 
-            // Atualizar relações com estações
             if (linha.getEstacoes() != null) {
-                // Remover relações existentes
                 deleteEstacaoLinhaRelations(linha.getId());
 
-                // Adicionar novas relações
                 saveEstacaoLinhaRelations(linha.getId(), linha.getEstacoes());
             }
         }
@@ -130,7 +124,6 @@ public class LinhaRepository {
     }
 
     public boolean deleteById(Integer id) throws SQLException {
-        // Soft delete - apenas marca como deletado
         String sql = "UPDATE tb_mvp_linha SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
 
         try (Connection connection = DatabaseConfig.getConnection();
@@ -146,7 +139,7 @@ public class LinhaRepository {
     public List<Linha> findByNome(String nome) throws SQLException {
         List<Linha> linhas = new ArrayList<>();
 
-        String sql = "SELECT l.id, l.nome, l.created_at, l.updated_at " +
+        String sql = "SELECT l.id, l.nome " +
                 "FROM tb_mvp_linha l " +
                 "WHERE l.nome LIKE ? AND l.deleted_at IS NULL";
 
@@ -159,7 +152,6 @@ public class LinhaRepository {
                 while (rs.next()) {
                     Linha linha = mapResultSetToLinha(rs);
 
-                    // Carregar as estações relacionadas
                     linha.setEstacoes(findEstacoesByLinhaId(linha.getId()));
 
                     linhas.add(linha);
@@ -227,10 +219,6 @@ public class LinhaRepository {
         Linha linha = new Linha();
         linha.setId(rs.getInt("id"));
         linha.setNome(rs.getString("nome"));
-
-        // Definir timestamps
-        linha.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        linha.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return linha;
     }

@@ -71,7 +71,7 @@ public class UsuarioRepository {
 
     public Optional<Usuario> findById(Integer id) throws SQLException {
         String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
-                "u.endereco_id, u.cargo, u.setor, u.created_at, u.updated_at " +
+                "u.endereco_id, u.cargo, u.setor " +
                 "FROM tb_mvp_usuario u " +
                 "WHERE u.id = ? AND u.deleted_at IS NULL";
 
@@ -95,7 +95,7 @@ public class UsuarioRepository {
         List<Usuario> usuarios = new ArrayList<>();
 
         String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
-                "u.endereco_id, u.cargo, u.setor, u.created_at, u.updated_at " +
+                "u.endereco_id, u.cargo, u.setor " +
                 "FROM tb_mvp_usuario u " +
                 "WHERE u.deleted_at IS NULL";
 
@@ -166,7 +166,7 @@ public class UsuarioRepository {
 
     public Optional<Usuario> findByEmail(String email) throws SQLException {
         String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
-                "u.endereco_id, u.cargo, u.setor, u.created_at, u.updated_at " +
+                "u.endereco_id, u.cargo, u.setor " +
                 "FROM tb_mvp_usuario u " +
                 "WHERE u.email = ? AND u.deleted_at IS NULL";
 
@@ -188,7 +188,7 @@ public class UsuarioRepository {
 
     public Optional<Usuario> findByCpf(String cpf) throws SQLException {
         String sql = "SELECT u.id, u.nome, u.cpf, u.email, u.senha, u.telefone, " +
-                "u.endereco_id, u.cargo, u.setor, u.created_at, u.updated_at " +
+                "u.endereco_id, u.cargo, u.setor " +
                 "FROM tb_mvp_usuario u " +
                 "WHERE u.cpf = ? AND u.deleted_at IS NULL";
 

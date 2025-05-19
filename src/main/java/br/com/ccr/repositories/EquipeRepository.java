@@ -69,7 +69,7 @@ public class EquipeRepository {
     }
 
     public Optional<Equipe> findById(Integer id) throws SQLException {
-        String sql = "SELECT e.id, e.nome, e.base_id, e.setor, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
                 "FROM tb_mvp_equipe e " +
                 "WHERE e.id = ? AND e.deleted_at IS NULL";
 
@@ -95,7 +95,7 @@ public class EquipeRepository {
     public List<Equipe> findAll() throws SQLException {
         List<Equipe> equipes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.base_id, e.setor, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
                 "FROM tb_mvp_equipe e " +
                 "WHERE e.deleted_at IS NULL";
 
@@ -170,7 +170,7 @@ public class EquipeRepository {
     public List<Equipe> findByNome(String nome) throws SQLException {
         List<Equipe> equipes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.base_id, e.setor, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
                 "FROM tb_mvp_equipe e " +
                 "WHERE e.nome LIKE ? AND e.deleted_at IS NULL";
 
@@ -196,7 +196,7 @@ public class EquipeRepository {
     public List<Equipe> findBySetor(Setor setor) throws SQLException {
         List<Equipe> equipes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.base_id, e.setor, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
                 "FROM tb_mvp_equipe e " +
                 "WHERE e.setor = ? AND e.deleted_at IS NULL";
 
@@ -222,7 +222,7 @@ public class EquipeRepository {
     public List<Equipe> findByBaseId(Integer baseId) throws SQLException {
         List<Equipe> equipes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.base_id, e.setor, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
                 "FROM tb_mvp_equipe e " +
                 "WHERE e.base_id = ? AND e.deleted_at IS NULL";
 
@@ -248,7 +248,7 @@ public class EquipeRepository {
     public List<Equipe> findByIntegranteId(Integer integranteId) throws SQLException {
         List<Equipe> equipes = new ArrayList<>();
 
-        String sql = "SELECT e.id, e.nome, e.base_id, e.setor, e.created_at, e.updated_at " +
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
                 "FROM tb_mvp_equipe e " +
                 "JOIN tb_mvp_equipe_usuario eu ON e.id = eu.equipe_id " +
                 "WHERE eu.usuario_id = ? AND e.deleted_at IS NULL";
@@ -341,9 +341,6 @@ public class EquipeRepository {
         if (setorStr != null) {
             equipe.setSetor(Setor.valueOf(setorStr));
         }
-
-        equipe.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        equipe.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return equipe;
     }

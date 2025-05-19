@@ -39,7 +39,7 @@ public class VagaoRepository {
     }
 
     public Optional<Vagao> findById(Integer id) throws SQLException {
-        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+        String sql = "SELECT v.id, v.numeracao " +
                 "FROM tb_mvp_vagao v " +
                 "WHERE v.id = ? AND v.deleted_at IS NULL";
 
@@ -62,7 +62,7 @@ public class VagaoRepository {
     public List<Vagao> findAll() throws SQLException {
         List<Vagao> vagoes = new ArrayList<>();
 
-        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+        String sql = "SELECT v.id, v.numeracao " +
                 "FROM tb_mvp_vagao v " +
                 "WHERE v.deleted_at IS NULL";
 
@@ -115,7 +115,7 @@ public class VagaoRepository {
     public List<Vagao> findByNumeracao(String numeracao) throws SQLException {
         List<Vagao> vagoes = new ArrayList<>();
 
-        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+        String sql = "SELECT v.id, v.numeracao " +
                 "FROM tb_mvp_vagao v " +
                 "WHERE v.numeracao LIKE ? AND v.deleted_at IS NULL";
 
@@ -138,7 +138,7 @@ public class VagaoRepository {
     public List<Vagao> findByTremId(Integer tremId) throws SQLException {
         List<Vagao> vagoes = new ArrayList<>();
 
-        String sql = "SELECT v.id, v.numeracao, v.created_at, v.updated_at " +
+        String sql = "SELECT v.id, v.numeracao " +
                 "FROM tb_mvp_vagao v " +
                 "JOIN tb_mvp_trem_vagao tv ON v.id = tv.vagao_id " +
                 "WHERE tv.trem_id = ? AND v.deleted_at IS NULL";
@@ -163,9 +163,6 @@ public class VagaoRepository {
         Vagao vagao = new Vagao();
         vagao.setId(rs.getInt("id"));
         vagao.setNumeracao(rs.getString("numeracao"));
-
-        vagao.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        vagao.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return vagao;
     }

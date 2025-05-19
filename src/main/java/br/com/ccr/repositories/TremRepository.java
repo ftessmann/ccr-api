@@ -87,7 +87,6 @@ public class TremRepository {
 
     public Optional<Trem> findById(Integer id) throws SQLException {
         String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
-                "t.created_at, t.updated_at " +
                 "FROM tb_mvp_trem t " +
                 "WHERE t.id = ? AND t.deleted_at IS NULL";
 
@@ -116,7 +115,6 @@ public class TremRepository {
         List<Trem> trens = new ArrayList<>();
 
         String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
-                "t.created_at, t.updated_at " +
                 "FROM tb_mvp_trem t " +
                 "WHERE t.deleted_at IS NULL";
 
@@ -205,7 +203,6 @@ public class TremRepository {
         List<Trem> trens = new ArrayList<>();
 
         String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
-                "t.created_at, t.updated_at " +
                 "FROM tb_mvp_trem t " +
                 "WHERE t.linha_id = ? AND t.deleted_at IS NULL";
 
@@ -234,7 +231,6 @@ public class TremRepository {
         List<Trem> trens = new ArrayList<>();
 
         String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
-                "t.created_at, t.updated_at " +
                 "FROM tb_mvp_trem t " +
                 "WHERE (t.estacao_inicial_id = ? OR t.estacao_final_id = ?) AND t.deleted_at IS NULL";
 
@@ -264,7 +260,6 @@ public class TremRepository {
         List<Trem> trens = new ArrayList<>();
 
         String sql = "SELECT t.id, t.modelo, t.estacao_inicial_id, t.estacao_final_id, t.linha_id, " +
-                "t.created_at, t.updated_at " +
                 "FROM tb_mvp_trem t " +
                 "JOIN tb_mvp_trem_condutor tc ON t.id = tc.trem_id " +
                 "WHERE tc.usuario_id = ? AND t.deleted_at IS NULL";
@@ -278,10 +273,8 @@ public class TremRepository {
                 while (rs.next()) {
                     Trem trem = mapResultSetToTrem(rs);
 
-                    // Carregar os condutores relacionados
                     trem.setCondutores(findCondutoresByTremId(trem.getId()));
 
-                    // Carregar os vagões relacionados
                     trem.setVagoes(findVagoesByTremId(trem.getId()));
 
                     trens.add(trem);
@@ -420,9 +413,6 @@ public class TremRepository {
             Optional<Linha> linha = linhaRepository.findById(linhaId);
             linha.ifPresent(trem::setLinha);
         }
-
-        trem.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        trem.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return trem;
     }

@@ -71,7 +71,7 @@ public class EnderecoRepository {
         List<Endereco> enderecos = new ArrayList<>();
 
         String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
-                "e.complemento, e.created_at, e.updated_at " +
+                "e.complemento " +
                 "FROM tb_mvp_endereco e " +
                 "WHERE e.deleted_at IS NULL";
 
@@ -133,7 +133,7 @@ public class EnderecoRepository {
         List<Endereco> enderecos = new ArrayList<>();
 
         String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
-                "e.complemento, e.created_at, e.updated_at " +
+                "e.complemento " +
                 "FROM tb_mvp_endereco e " +
                 "WHERE e.cidade LIKE ? AND e.deleted_at IS NULL";
 
@@ -155,7 +155,7 @@ public class EnderecoRepository {
 
     public Optional<Endereco> findByCep(String cep) throws SQLException {
         String sql = "SELECT e.id, e.cep, e.rua, e.numero, e.bairro, e.cidade, e.estado, " +
-                "e.complemento, e.created_at, e.updated_at " +
+                "e.complemento " +
                 "FROM tb_mvp_endereco e " +
                 "WHERE e.cep = ? AND e.deleted_at IS NULL";
 

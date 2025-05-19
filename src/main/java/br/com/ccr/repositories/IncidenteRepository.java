@@ -68,7 +68,7 @@ public class IncidenteRepository {
 
     public Optional<Incidente> findById(Integer id) throws SQLException {
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved, i.created_at, i.updated_at " +
+                "i.criador_id, i.is_resolved " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.id = ? AND i.deleted_at IS NULL";
 
@@ -92,7 +92,7 @@ public class IncidenteRepository {
         List<Incidente> incidentes = new ArrayList<>();
 
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved, i.created_at, i.updated_at " +
+                "i.criador_id, i.is_resolved " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.deleted_at IS NULL " +
                 "ORDER BY i.created_at DESC";
@@ -166,7 +166,7 @@ public class IncidenteRepository {
         List<Incidente> incidentes = new ArrayList<>();
 
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved, i.created_at, i.updated_at " +
+                "i.criador_id, i.is_resolved " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.gravidade = ? AND i.deleted_at IS NULL " +
                 "ORDER BY i.created_at DESC";
@@ -191,7 +191,7 @@ public class IncidenteRepository {
         List<Incidente> incidentes = new ArrayList<>();
 
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved, i.created_at, i.updated_at " +
+                "i.criador_id, i.is_resolved " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.criador_id = ? AND i.deleted_at IS NULL " +
                 "ORDER BY i.created_at DESC";
@@ -216,7 +216,7 @@ public class IncidenteRepository {
         List<Incidente> incidentes = new ArrayList<>();
 
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved, i.created_at, i.updated_at " +
+                "i.criador_id, i.is_resolved " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.is_resolved = ? AND i.deleted_at IS NULL " +
                 "ORDER BY i.created_at DESC";
@@ -259,9 +259,6 @@ public class IncidenteRepository {
 
         String isResolvedStr = rs.getString("is_resolved");
         incidente.setIsResolved(isResolvedStr != null && isResolvedStr.equals("S"));
-
-        incidente.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
-        incidente.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return incidente;
     }

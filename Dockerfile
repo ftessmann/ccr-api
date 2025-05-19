@@ -8,10 +8,15 @@ RUN mvn -B -DskipTests clean package
 
 RUN apt-get update && apt-get install -y openssl
 RUN mkdir -p /app/src/main/resources/
+
 RUN openssl genrsa -out /app/src/main/resources/privateKey.pem 2048 && \
-    openssl rsa -in /app/src/main/resources/privateKey.pem -pubout -out /app/src/main/resources/publicKey.pem
+    openssl pkcs8 -topk8 -nocrypt -inform PEM -in /app/src/main/resources/privateKey.pem -out /app/src/main/resources/privateKey.pem && \
+    openssl rsa -in /app/src/main/resources/privateKey.pem -pubout -outform PEM -out /app/src/main/resources/publicKey.pem
+
 
 RUN ls -la /app/src/main/resources
+
+RUN cat /app/src/main/resources/publicKey.pem
 
 RUN ls -la target/
 

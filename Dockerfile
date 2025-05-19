@@ -6,4 +6,6 @@ COPY . .
 
 RUN mvn -B -DskipTests clean package
 
+RUN ls -la target/
+
 CMD ["java", "-jar", "target/ccr-api-dev.jar"]

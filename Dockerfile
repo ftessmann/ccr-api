@@ -8,4 +8,4 @@ RUN mvn -B -DskipTests clean package
 
 RUN ls -la target/
 
-CMD ["java", "-jar", "target/ccr-api-dev.jar"]
+CMD ["java", "-jar", "target/ccr-api-1.0.0-CCR.jar"]

@@ -1,127 +1,113 @@
 package br.com.ccr.resources;
 
+import br.com.ccr.dtos.EquipeDTO;
 import br.com.ccr.entities.Equipe;
+import br.com.ccr.entities.Setor;
 import br.com.ccr.entities.Usuario;
+import br.com.ccr.mappers.EquipeMapper;
 import br.com.ccr.repositories.EquipeRepository;
-import br.com.ccr.repositories.UsuarioRepository;
-
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriBuilder;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Path("/equipes")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class EquipeResource {
 
-    private static final Logger log = LogManager.getLogger(EquipeResource.class);
+    @Inject
+    private EquipeRepository equipeRepository;
 
     @Inject
-    EquipeRepository equipeRepository;
+    private EquipeMapper equipeMapper;
 
-    @Inject
-    UsuarioRepository usuarioRepository;
-
-    @GET
-    public Response listar(
-            @QueryParam("nome") String nome,
-            @QueryParam("localizacaoId") Integer localizacaoId,
-            @QueryParam("estacaoId") Integer estacaoId
-    ) {
+    @POST
+    public Response createEquipe(EquipeDTO equipeDTO) {
         try {
-            List<Equipe> equipes;
+            Equipe equipe = equipeMapper.toEntity(equipeDTO);
 
-            if (nome != null && !nome.isEmpty()) {
-                log.info("Buscando equipes por nome: {}", nome);
-                equipes = equipeRepository.buscarPorNome(nome);
-            } else if (localizacaoId != null) {
-                log.info("Buscando equipes por localização: {}", localizacaoId);
-                equipes = equipeRepository.buscarPorLocalizacao(localizacaoId);
-            } else if (estacaoId != null) {
-                log.info("Buscando equipes por estação base: {}", estacaoId);
-                equipes = equipeRepository.buscarPorEstacaoBase(estacaoId);
-            } else {
-                log.info("Listando todas as equipes");
-                equipes = equipeRepository.listarTodos();
-            }
+            Equipe savedEquipe = equipeRepository.save(equipe);
 
-            return Response.ok(equipes).build();
-        } catch (Exception e) {
-            log.error("Erro ao listar equipes", e);
+            EquipeDTO savedEquipeDTO = equipeMapper.toDTO(savedEquipe);
+
+            return Response.status(Response.Status.CREATED)
+                    .entity(savedEquipeDTO)
+                    .build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao listar equipes: " + e.getMessage())
+                    .entity("Erro ao criar equipe: " + e.getMessage())
                     .build();
         }
     }
 
     @GET
     @Path("/{id}")
-    public Response buscarPorId(@PathParam("id") int id) {
+    public Response getEquipeById(@PathParam("id") Integer id) {
         try {
-            Optional<Equipe> equipe = equipeRepository.buscarPorId(id);
+            Optional<Equipe> equipe = equipeRepository.findById(id);
 
             if (equipe.isPresent()) {
-                return Response.ok(equipe.get()).build();
+                EquipeDTO equipeDTO = equipeMapper.toDTO(equipe.get());
+                return Response.ok(equipeDTO).build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Equipe não encontrada com ID: " + id)
+                        .entity("Equipe não encontrada")
                         .build();
             }
-        } catch (Exception e) {
-            log.error("Erro ao buscar equipe por ID", e);
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Erro ao buscar equipe: " + e.getMessage())
                     .build();
         }
     }
 
-    @POST
-    @Transactional
-    public Response adicionar(Equipe equipe) {
+    @GET
+    public Response getAllEquipes() {
         try {
-            Equipe novaEquipe = equipeRepository.salvar(equipe);
+            List<Equipe> equipes = equipeRepository.findAll();
+            List<EquipeDTO> equipeDTOs = equipes.stream()
+                    .map(equipeMapper::toDTO)
+                    .collect(Collectors.toList());
 
-            return Response.created(
-                            UriBuilder.fromResource(EquipeResource.class)
-                                    .path(String.valueOf(novaEquipe.getId()))
-                                    .build())
-                    .entity(novaEquipe)
-                    .build();
-        } catch (Exception e) {
-            log.error("Erro ao adicionar equipe", e);
+            return Response.ok(equipeDTOs).build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao adicionar equipe: " + e.getMessage())
+                    .entity("Erro ao buscar equipes: " + e.getMessage())
                     .build();
         }
     }
 
     @PUT
     @Path("/{id}")
-    @Transactional
-    public Response atualizar(@PathParam("id") int id, Equipe equipe) {
+    public Response updateEquipe(@PathParam("id") Integer id, EquipeDTO equipeDTO) {
         try {
-            Optional<Equipe> equipeExistente = equipeRepository.buscarPorId(id);
+            Optional<Equipe> existingEquipe = equipeRepository.findById(id);
 
-            if (equipeExistente.isPresent()) {
-                equipe.setId(id);
-                equipeRepository.atualizar(id, equipe);
-                return Response.ok(equipe).build();
-            } else {
+            if (!existingEquipe.isPresent()) {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Equipe não encontrada com ID: " + id)
+                        .entity("Equipe não encontrada")
                         .build();
             }
-        } catch (Exception e) {
-            log.error("Erro ao atualizar equipe", e);
+
+            // Converter DTO para entidade
+            Equipe equipe = equipeMapper.toEntity(equipeDTO);
+            equipe.setId(id);
+
+            // Atualizar no banco
+            Equipe updatedEquipe = equipeRepository.update(equipe);
+
+            // Converter entidade atualizada para DTO
+            EquipeDTO updatedEquipeDTO = equipeMapper.toDTO(updatedEquipe);
+
+            return Response.ok(updatedEquipeDTO).build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Erro ao atualizar equipe: " + e.getMessage())
                     .build();
@@ -130,89 +116,160 @@ public class EquipeResource {
 
     @DELETE
     @Path("/{id}")
-    @Transactional
-    public Response remover(@PathParam("id") int id) {
+    public Response deleteEquipe(@PathParam("id") Integer id) {
         try {
-            Optional<Equipe> equipe = equipeRepository.buscarPorId(id);
+            boolean deleted = equipeRepository.deleteById(id);
 
-            if (equipe.isPresent()) {
-                equipeRepository.remover(id);
+            if (deleted) {
                 return Response.noContent().build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Equipe não encontrada com ID: " + id)
+                        .entity("Equipe não encontrada")
                         .build();
             }
-        } catch (Exception e) {
-            log.error("Erro ao remover equipe", e);
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao remover equipe: " + e.getMessage())
+                    .entity("Erro ao excluir equipe: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/nome/{nome}")
+    public Response getEquipesByNome(@PathParam("nome") String nome) {
+        try {
+            List<Equipe> equipes = equipeRepository.findByNome(nome);
+            List<EquipeDTO> equipeDTOs = equipes.stream()
+                    .map(equipeMapper::toDTO)
+                    .collect(Collectors.toList());
+
+            return Response.ok(equipeDTOs).build();
+        } catch (SQLException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro ao buscar equipes por nome: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/setor/{setor}")
+    public Response getEquipesBySetor(@PathParam("setor") String setorStr) {
+        try {
+            Setor setor = Setor.valueOf(setorStr.toUpperCase());
+            List<Equipe> equipes = equipeRepository.findBySetor(setor);
+            List<EquipeDTO> equipeDTOs = equipes.stream()
+                    .map(equipeMapper::toDTO)
+                    .collect(Collectors.toList());
+
+            return Response.ok(equipeDTOs).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Setor inválido: " + setorStr)
+                    .build();
+        } catch (SQLException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro ao buscar equipes por setor: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/base/{baseId}")
+    public Response getEquipesByBaseId(@PathParam("baseId") Integer baseId) {
+        try {
+            List<Equipe> equipes = equipeRepository.findByBaseId(baseId);
+            List<EquipeDTO> equipeDTOs = equipes.stream()
+                    .map(equipeMapper::toDTO)
+                    .collect(Collectors.toList());
+
+            return Response.ok(equipeDTOs).build();
+        } catch (SQLException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro ao buscar equipes por base: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/integrante/{integranteId}")
+    public Response getEquipesByIntegranteId(@PathParam("integranteId") Integer integranteId) {
+        try {
+            List<Equipe> equipes = equipeRepository.findByIntegranteId(integranteId);
+            List<EquipeDTO> equipeDTOs = equipes.stream()
+                    .map(equipeMapper::toDTO)
+                    .collect(Collectors.toList());
+
+            return Response.ok(equipeDTOs).build();
+        } catch (SQLException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Erro ao buscar equipes por integrante: " + e.getMessage())
                     .build();
         }
     }
 
     @POST
-    @Path("/{equipeId}/integrantes/{usuarioId}")
-    @Transactional
-    public Response adicionarIntegrante(
-            @PathParam("equipeId") int equipeId,
-            @PathParam("usuarioId") int usuarioId
-    ) {
+    @Path("/{id}/integrantes")
+    public Response addIntegranteToEquipe(@PathParam("id") Integer equipeId, Integer integranteId) {
         try {
-            Optional<Equipe> equipeOpt = equipeRepository.buscarPorId(equipeId);
-            Optional<Usuario> usuarioOpt = usuarioRepository.buscarPorId(usuarioId);
+            Optional<Equipe> equipeOpt = equipeRepository.findById(equipeId);
 
-            if (equipeOpt.isEmpty()) {
+            if (!equipeOpt.isPresent()) {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Equipe não encontrada com ID: " + equipeId)
+                        .entity("Equipe não encontrada")
                         .build();
             }
 
-            if (usuarioOpt.isEmpty()) {
-                return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Usuário não encontrado com ID: " + usuarioId)
-                        .build();
+            Equipe equipe = equipeOpt.get();
+
+            ArrayList<Usuario> integrantes = equipe.getIntegrantes();
+            if (integrantes == null) {
+                integrantes = new ArrayList<>();
+                equipe.setIntegrantes(integrantes);
             }
 
-            equipeRepository.adicionarIntegrante(equipeOpt.get(), usuarioOpt.get());
-            return Response.ok().build();
-        } catch (Exception e) {
-            log.error("Erro ao adicionar integrante à equipe", e);
+            Usuario novoIntegrante = new Usuario();
+            novoIntegrante.setId(integranteId);
+            integrantes.add(novoIntegrante);
+
+            Equipe updatedEquipe = equipeRepository.update(equipe);
+
+            EquipeDTO updatedEquipeDTO = equipeMapper.toDTO(updatedEquipe);
+
+            return Response.ok(updatedEquipeDTO).build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao adicionar integrante: " + e.getMessage())
+                    .entity("Erro ao adicionar integrante à equipe: " + e.getMessage())
                     .build();
         }
     }
 
     @DELETE
-    @Path("/{equipeId}/integrantes/{usuarioId}")
-    @Transactional
-    public Response removerIntegrante(
-            @PathParam("equipeId") int equipeId,
-            @PathParam("usuarioId") int usuarioId
-    ) {
+    @Path("/{id}/integrantes/{integranteId}")
+    public Response removeIntegranteFromEquipe(@PathParam("id") Integer equipeId, @PathParam("integranteId") Integer integranteId) {
         try {
-            Optional<Equipe> equipeOpt = equipeRepository.buscarPorId(equipeId);
-            Optional<Usuario> usuarioOpt = usuarioRepository.buscarPorId(usuarioId);
+            Optional<Equipe> equipeOpt = equipeRepository.findById(equipeId);
 
-            if (equipeOpt.isEmpty()) {
+            if (!equipeOpt.isPresent()) {
                 return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Equipe não encontrada com ID: " + equipeId)
+                        .entity("Equipe não encontrada")
                         .build();
             }
 
-            if (usuarioOpt.isEmpty()) {
-                return Response.status(Response.Status.NOT_FOUND)
-                        .entity("Usuário não encontrado com ID: " + usuarioId)
-                        .build();
+            Equipe equipe = equipeOpt.get();
+
+            ArrayList<Usuario> integrantes = equipe.getIntegrantes();
+            if (integrantes != null) {
+                integrantes.removeIf(u -> u.getId().equals(integranteId));
             }
 
-            equipeRepository.removerIntegrante(equipeOpt.get(), usuarioOpt.get());
-            return Response.noContent().build();
-        } catch (Exception e) {
-            log.error("Erro ao remover integrante da equipe", e);
+            Equipe updatedEquipe = equipeRepository.update(equipe);
+
+            EquipeDTO updatedEquipeDTO = equipeMapper.toDTO(updatedEquipe);
+
+            return Response.ok(updatedEquipeDTO).build();
+        } catch (SQLException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Erro ao remover integrante: " + e.getMessage())
+                    .entity("Erro ao remover integrante da equipe: " + e.getMessage())
                     .build();
         }
     }

@@ -1,19 +1,24 @@
 package br.com.ccr.entities;
 
-import lombok.*;
-
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Objects;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@ToString
-@EqualsAndHashCode
 public class Equipe extends BaseModel {
     private String nome;
     private ArrayList<Usuario> integrantes;
-    private Localizacao localizacao;
     private Estacao base;
+    private Setor setor;
+
+    public Equipe() {
+    }
+
+    public Equipe(String nome, ArrayList<Usuario> integrantes, Estacao base, Setor setor) {
+        this.nome = nome;
+        this.integrantes = integrantes;
+        this.base = base;
+        this.setor = setor;
+    }
 
     public String getNome() {
         return nome;
@@ -31,19 +36,19 @@ public class Equipe extends BaseModel {
         this.integrantes = integrantes;
     }
 
-    public Localizacao getLocalizacao() {
-        return localizacao;
-    }
-
-    public void setLocalizacao(Localizacao localizacao) {
-        this.localizacao = localizacao;
-    }
-
     public Estacao getBase() {
         return base;
     }
 
     public void setBase(Estacao base) {
         this.base = base;
+    }
+
+    public Setor getSetor() {
+        return setor;
+    }
+
+    public void setSetor(Setor setor) {
+        this.setor = setor;
     }
 }

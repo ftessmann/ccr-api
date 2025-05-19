@@ -1,375 +1,265 @@
 package br.com.ccr.repositories;
 
-import br.com.ccr.entities.Equipe;
+import br.com.ccr.entities.Gravidade;
 import br.com.ccr.entities.Incidente;
+import br.com.ccr.entities.Usuario;
 import br.com.ccr.infrastructure.DatabaseConfig;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class IncidenteRepository extends CrudRepositoryImpl<Incidente> {
+@ApplicationScoped
+public class IncidenteRepository {
 
-    private static final Logger log = LogManager.getLogger(IncidenteRepository.class);
+    @Inject
+    private UsuarioRepository usuarioRepository;
 
-    private final UsuarioRepository usuarioRepository;
-    private final LocalizacaoRepository localizacaoRepository;
-    private final GravidadeRepository gravidadeRepository;
-    private final EquipeRepository equipeRepository;
-
-    public IncidenteRepository(
-            UsuarioRepository usuarioRepository,
-            LocalizacaoRepository localizacaoRepository,
-            GravidadeRepository gravidadeRepository,
-            EquipeRepository equipeRepository
-    ) {
-        this.usuarioRepository = usuarioRepository;
-        this.localizacaoRepository = localizacaoRepository;
-        this.gravidadeRepository = gravidadeRepository;
-        this.equipeRepository = equipeRepository;
+    public IncidenteRepository() {
     }
 
-    public IncidenteRepository(
-            UsuarioRepository usuarioRepository,
-            LocalizacaoRepository localizacaoRepository,
-            GravidadeRepository gravidadeRepository
-    ) {
-        this.usuarioRepository = usuarioRepository;
-        this.localizacaoRepository = localizacaoRepository;
-        this.gravidadeRepository = gravidadeRepository;
-        this.equipeRepository = null;
-    }
+    public Incidente save(Incidente incidente) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_incidente (latitude, longitude, descricao, gravidade, nome, criador_id, is_resolved, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
-    @Override
-    protected String getTableName() {
-        return "T_CCR_INCIDENTE";
-    }
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_INCIDENTE(nm_incidente, descricao_incidente, T_CCR_USUARIO_id_usuario, " +
-                "T_CCR_GRAVIDADE_id, T_CCR_LOCALIZACAO_id, dt_incidente, dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    }
+            stmt.setString(1, incidente.getLatitude());
+            stmt.setString(2, incidente.getLongitude());
+            stmt.setString(3, incidente.getDescricao());
 
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_INCIDENTE SET nm_incidente = ?, descricao_incidente = ?, T_CCR_USUARIO_id_usuario = ?, " +
-                "T_CCR_GRAVIDADE_id = ?, T_CCR_LOCALIZACAO_id = ?, dt_incidente = ?, " +
-                "dt_atualizacao = ?, dt_exclusao = ? WHERE id_incidente = ?";
-    }
+            if (incidente.getGravidade() != null) {
+                stmt.setString(4, incidente.getGravidade().name());
+            } else {
+                stmt.setNull(4, Types.VARCHAR);
+            }
 
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_INCIDENTE WHERE id_incidente = ? AND dt_exclusao IS NULL";
-    }
+            stmt.setString(5, incidente.getNome());
 
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_INCIDENTE WHERE dt_exclusao IS NULL";
-    }
+            if (incidente.getCriador() != null && incidente.getCriador().getId() != null) {
+                stmt.setInt(6, incidente.getCriador().getId());
+            } else {
+                stmt.setNull(6, Types.INTEGER);
+            }
 
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_INCIDENTE SET dt_exclusao = ? WHERE id_incidente = ?";
-    }
+            stmt.setString(7, incidente.getIsResolved() ? "S" : "N");
 
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Incidente incidente) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, incidente.getNome());
-        stmt.setString(index++, incidente.getDescricao());
+            int affectedRows = stmt.executeUpdate();
 
-        if (incidente.getCriador() != null) {
-            stmt.setInt(index++, incidente.getCriador().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar incidente, nenhuma linha afetada.");
+            }
 
-        if (incidente.getGravidade() != null) {
-            gravidadeRepository.setGravidadeAsId(stmt, index++, incidente.getGravidade());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (incidente.getLocalizacao() != null) {
-            stmt.setInt(index++, incidente.getLocalizacao().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (incidente.getDate() != null) {
-            stmt.setTimestamp(index++, Timestamp.valueOf(incidente.getDate()));
-        } else {
-            stmt.setTimestamp(index++, Timestamp.valueOf(LocalDateTime.now()));
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        incidente.setCreatedAt(now);
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, incidente.getUpdatedAt() != null ?
-                Timestamp.valueOf(incidente.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, incidente.getDeletedAt() != null ?
-                Timestamp.valueOf(incidente.getDeletedAt()) : null);
-    }
-
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Incidente incidente) throws SQLException {
-
-        LocalDateTime now = LocalDateTime.now();
-        incidente.setUpdatedAt(now);
-
-        int index = 1;
-        stmt.setString(index++, incidente.getNome());
-        stmt.setString(index++, incidente.getDescricao());
-
-
-        if (incidente.getCriador() != null) {
-            stmt.setInt(index++, incidente.getCriador().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-
-        if (incidente.getGravidade() != null) {
-            gravidadeRepository.setGravidadeAsId(stmt, index++, incidente.getGravidade());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (incidente.getLocalizacao() != null) {
-            stmt.setInt(index++, incidente.getLocalizacao().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (incidente.getDate() != null) {
-            stmt.setTimestamp(index++, Timestamp.valueOf(incidente.getDate()));
-        } else {
-            stmt.setTimestamp(index++, Timestamp.valueOf(LocalDateTime.now()));
-        }
-
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, incidente.getDeletedAt() != null ?
-                Timestamp.valueOf(incidente.getDeletedAt()) : null);
-
-        stmt.setInt(index++, incidente.getId());
-    }
-
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 9;
-    }
-
-    @Override
-    protected Incidente mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Incidente incidente = new Incidente();
-        incidente.setId(rs.getInt("id_incidente"));
-        incidente.setNome(rs.getString("nm_incidente"));
-        incidente.setDescricao(rs.getString("descricao_incidente"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-        Timestamp incidenteDate = rs.getTimestamp("dt_incidente");
-
-        if (createdAt != null) {
-            incidente.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        if (updatedAt != null) {
-            incidente.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            incidente.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-        if (incidenteDate != null) {
-            incidente.setDate(incidenteDate.toLocalDateTime());
-        }
-
-        int usuarioId = rs.getInt("T_CCR_USUARIO_id_usuario");
-        if (!rs.wasNull() && usuarioRepository != null) {
-            usuarioRepository.buscarPorId(usuarioId)
-                    .ifPresent(incidente::setCriador);
-        }
-
-        int localizacaoId = rs.getInt("T_CCR_LOCALIZACAO_id");
-        if (!rs.wasNull() && localizacaoRepository != null) {
-            localizacaoRepository.buscarPorId(localizacaoId)
-                    .ifPresent(incidente::setLocalizacao);
-        }
-
-        int gravidadeId = rs.getInt("T_CCR_GRAVIDADE_id");
-        if (!rs.wasNull()) {
-            incidente.setGravidade(gravidadeRepository.getGravidadeById(gravidadeId));
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    incidente.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar incidente, nenhum ID obtido.");
+                }
+            }
         }
 
         return incidente;
     }
 
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
+    public Optional<Incidente> findById(Integer id) throws SQLException {
+        String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
+                "i.criador_id, i.is_resolved " +
+                "FROM tb_mvp_incidente i " +
+                "WHERE i.id = ? AND i.deleted_at IS NULL";
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            int result = stmt.executeUpdate();
+            stmt.setInt(1, id);
 
-            if (result > 0) {
-                Optional<Incidente> incidente = buscarPorId(id);
-                incidente.ifPresent(i -> {
-                    i.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, i);
-                });
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao remover incidente", e);
-        }
-    }
-
-    // metodos adicionais para incidente
-
-    public List<Incidente> buscarPorNome(String nome) {
-        List<Incidente> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_INCIDENTE WHERE nm_incidente LIKE ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, "%" + nome + "%");
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Incidente incidente = mapResultSetToEntity(rs);
-                    resultado.add(incidente);
-                    storage.put(incidente.getId(), incidente);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Incidente incidente = mapResultSetToIncidente(rs);
+                    return Optional.of(incidente);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar incidentes por nome", e);
         }
 
-        return resultado;
+        return Optional.empty();
     }
 
-    public List<Incidente> buscarPorGravidade(int gravidadeId) {
-        List<Incidente> resultado = new ArrayList<>();
+    public List<Incidente> findAll() throws SQLException {
+        List<Incidente> incidentes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_INCIDENTE WHERE T_CCR_GRAVIDADE_id = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
+                "i.criador_id, i.is_resolved " +
+                "FROM tb_mvp_incidente i " +
+                "WHERE i.deleted_at IS NULL " +
+                "ORDER BY i.created_at DESC";
 
-            stmt.setInt(1, gravidadeId);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
 
-            try (var rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                Incidente incidente = mapResultSetToIncidente(rs);
+                incidentes.add(incidente);
+            }
+        }
+
+        return incidentes;
+    }
+
+    public Incidente update(Incidente incidente) throws SQLException {
+        String sql = "UPDATE tb_mvp_incidente SET latitude = ?, longitude = ?, descricao = ?, " +
+                "gravidade = ?, nome = ?, criador_id = ?, is_resolved = ?, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, incidente.getLatitude());
+            stmt.setString(2, incidente.getLongitude());
+            stmt.setString(3, incidente.getDescricao());
+
+            if (incidente.getGravidade() != null) {
+                stmt.setString(4, incidente.getGravidade().name());
+            } else {
+                stmt.setNull(4, Types.VARCHAR);
+            }
+
+            stmt.setString(5, incidente.getNome());
+
+            if (incidente.getCriador() != null && incidente.getCriador().getId() != null) {
+                stmt.setInt(6, incidente.getCriador().getId());
+            } else {
+                stmt.setNull(6, Types.INTEGER);
+            }
+
+            stmt.setString(7, incidente.getIsResolved() ? "S" : "N");
+            stmt.setInt(8, incidente.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar incidente, nenhuma linha afetada.");
+            }
+        }
+
+        return incidente;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_incidente SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public List<Incidente> findByGravidade(Gravidade gravidade) throws SQLException {
+        List<Incidente> incidentes = new ArrayList<>();
+
+        String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
+                "i.criador_id, i.is_resolved " +
+                "FROM tb_mvp_incidente i " +
+                "WHERE i.gravidade = ? AND i.deleted_at IS NULL " +
+                "ORDER BY i.created_at DESC";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, gravidade.name());
+
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Incidente incidente = mapResultSetToEntity(rs);
-                    resultado.add(incidente);
-                    storage.put(incidente.getId(), incidente);
+                    Incidente incidente = mapResultSetToIncidente(rs);
+                    incidentes.add(incidente);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar incidentes por gravidade", e);
         }
 
-        return resultado;
+        return incidentes;
     }
 
-    public List<Incidente> buscarPorUsuario(int usuarioId) {
-        List<Incidente> resultado = new ArrayList<>();
+    public List<Incidente> findByCriadorId(Integer criadorId) throws SQLException {
+        List<Incidente> incidentes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_INCIDENTE WHERE T_CCR_USUARIO_id_usuario = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
+                "i.criador_id, i.is_resolved " +
+                "FROM tb_mvp_incidente i " +
+                "WHERE i.criador_id = ? AND i.deleted_at IS NULL " +
+                "ORDER BY i.created_at DESC";
 
-            stmt.setInt(1, usuarioId);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            try (var rs = stmt.executeQuery()) {
+            stmt.setInt(1, criadorId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Incidente incidente = mapResultSetToEntity(rs);
-                    resultado.add(incidente);
-                    storage.put(incidente.getId(), incidente);
+                    Incidente incidente = mapResultSetToIncidente(rs);
+                    incidentes.add(incidente);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar incidentes por usuário", e);
         }
 
-        return resultado;
+        return incidentes;
     }
 
-    public void associarEquipe(Incidente incidente, Equipe equipe) {
-        if (equipeRepository == null) {
-            log.error("EquipeRepository não inicializado");
-            return;
-        }
+    public List<Incidente> findByStatus(boolean resolvido) throws SQLException {
+        List<Incidente> incidentes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "INSERT INTO T_CCR_INCIDENTE_EQUIPE(T_CCR_INCIDENTE_id, T_CCR_EQUIPE_id, dt_criacao) " +
-                             "VALUES (?, ?, ?) ON CONFLICT (T_CCR_INCIDENTE_id, T_CCR_EQUIPE_id) DO NOTHING")) {
+        String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
+                "i.criador_id, i.is_resolved " +
+                "FROM tb_mvp_incidente i " +
+                "WHERE i.is_resolved = ? AND i.deleted_at IS NULL " +
+                "ORDER BY i.created_at DESC";
 
-            stmt.setInt(1, incidente.getId());
-            stmt.setInt(2, equipe.getId());
-            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.executeUpdate();
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-        } catch (SQLException e) {
-            log.error("Erro ao associar equipe ao incidente", e);
-        }
-    }
+            stmt.setString(1, resolvido ? "S" : "N");
 
-    public void desassociarEquipe(Incidente incidente, Equipe equipe) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "UPDATE T_CCR_INCIDENTE_EQUIPE SET dt_exclusao = ? " +
-                             "WHERE T_CCR_INCIDENTE_id = ? AND T_CCR_EQUIPE_id = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, incidente.getId());
-            stmt.setInt(3, equipe.getId());
-            stmt.executeUpdate();
-
-        } catch (SQLException e) {
-            log.error("Erro ao desassociar equipe do incidente", e);
-        }
-    }
-
-    public List<Equipe> listarEquipesDoIncidente(int incidenteId) {
-        List<Equipe> equipes = new ArrayList<>();
-
-        if (equipeRepository == null) {
-            log.error("EquipeRepository não inicializado");
-            return equipes;
-        }
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT T_CCR_EQUIPE_id FROM T_CCR_INCIDENTE_EQUIPE " +
-                             "WHERE T_CCR_INCIDENTE_id = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setInt(1, incidenteId);
-
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    int equipeId = rs.getInt("T_CCR_EQUIPE_id");
-                    equipeRepository.buscarPorId(equipeId)
-                            .ifPresent(equipes::add);
+                    Incidente incidente = mapResultSetToIncidente(rs);
+                    incidentes.add(incidente);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao listar equipes do incidente", e);
         }
 
-        return equipes;
+        return incidentes;
+    }
+
+    private Incidente mapResultSetToIncidente(ResultSet rs) throws SQLException {
+        Incidente incidente = new Incidente();
+        incidente.setId(rs.getInt("id"));
+        incidente.setLatitude(rs.getString("latitude"));
+        incidente.setLongitude(rs.getString("longitude"));
+        incidente.setDescricao(rs.getString("descricao"));
+
+        String gravidadeStr = rs.getString("gravidade");
+        if (gravidadeStr != null) {
+            incidente.setGravidade(Gravidade.valueOf(gravidadeStr));
+        }
+
+        incidente.setNome(rs.getString("nome"));
+
+        Integer criadorId = rs.getInt("criador_id");
+        if (!rs.wasNull()) {
+            Optional<Usuario> criador = usuarioRepository.findById(criadorId);
+            criador.ifPresent(incidente::setCriador);
+        }
+
+        String isResolvedStr = rs.getString("is_resolved");
+        incidente.setIsResolved(isResolvedStr != null && isResolvedStr.equals("S"));
+
+        return incidente;
     }
 }

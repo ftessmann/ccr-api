@@ -1,304 +1,347 @@
 package br.com.ccr.repositories;
 
 import br.com.ccr.entities.Equipe;
+import br.com.ccr.entities.Estacao;
+import br.com.ccr.entities.Setor;
 import br.com.ccr.entities.Usuario;
 import br.com.ccr.infrastructure.DatabaseConfig;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class EquipeRepository extends CrudRepositoryImpl<Equipe> {
+@ApplicationScoped
+public class EquipeRepository {
 
-    private static final Logger log = LogManager.getLogger(EquipeRepository.class);
+    @Inject
+    private EstacaoRepository estacaoRepository;
 
-    private final UsuarioRepository usuarioRepository;
-    private final LocalizacaoRepository localizacaoRepository;
-    private final EstacaoRepository estacaoRepository;
+    @Inject
+    private UsuarioRepository usuarioRepository;
 
-    public EquipeRepository(
-            UsuarioRepository usuarioRepository,
-            LocalizacaoRepository localizacaoRepository,
-            EstacaoRepository estacaoRepository
-    ) {
-        this.usuarioRepository = usuarioRepository;
-        this.localizacaoRepository = localizacaoRepository;
-        this.estacaoRepository = estacaoRepository;
+    public EquipeRepository() {
     }
 
-    @Override
-    protected String getTableName() {
-        return "T_CCR_EQUIPE";
-    }
+    public Equipe save(Equipe equipe) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_equipe (nome, base_id, setor, created_at) " +
+                "VALUES (?, ?, ?, CURRENT_TIMESTAMP)";
 
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_EQUIPE(nm_equipe, estacao_base_id, T_CCR_LOCALIZACAO_id, dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
-    }
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_EQUIPE SET nm_equipe = ?, estacao_base_id = ?, T_CCR_LOCALIZACAO_id = ?, " +
-                "dt_atualizacao = ?, dt_exclusao = ? WHERE id_equipe = ?";
-    }
+            stmt.setString(1, equipe.getNome());
 
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_EQUIPE WHERE id_equipe = ? AND dt_exclusao IS NULL";
-    }
+            if (equipe.getBase() != null) {
+                stmt.setInt(2, equipe.getBase().getId());
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
 
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_EQUIPE WHERE dt_exclusao IS NULL";
-    }
+            if (equipe.getSetor() != null) {
+                stmt.setString(3, equipe.getSetor().name());
+            } else {
+                stmt.setNull(3, Types.VARCHAR);
+            }
 
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_EQUIPE SET dt_exclusao = ? WHERE id_equipe = ?";
-    }
+            int affectedRows = stmt.executeUpdate();
 
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Equipe equipe) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, equipe.getNome());
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar equipe, nenhuma linha afetada.");
+            }
 
-        if (equipe.getBase() != null) {
-            stmt.setInt(index++, equipe.getBase().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    equipe.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar equipe, nenhum ID obtido.");
+                }
+            }
+
+            if (equipe.getIntegrantes() != null && !equipe.getIntegrantes().isEmpty()) {
+                saveEquipeUsuarioRelations(equipe.getId(), equipe.getIntegrantes());
+            }
         }
-
-        if (equipe.getLocalizacao() != null) {
-            stmt.setInt(index++, equipe.getLocalizacao().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        stmt.setTimestamp(index++, Timestamp.valueOf(LocalDateTime.now())); // dt_criacao
-        stmt.setTimestamp(index++, equipe.getUpdatedAt() != null ?
-                Timestamp.valueOf(equipe.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, equipe.getDeletedAt() != null ?
-                Timestamp.valueOf(equipe.getDeletedAt()) : null);
-    }
-
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Equipe equipe) throws SQLException {
-        equipe.setUpdatedAt(LocalDateTime.now());
-
-        int index = 1;
-        stmt.setString(index++, equipe.getNome());
-
-        if (equipe.getBase() != null) {
-            stmt.setInt(index++, equipe.getBase().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        if (equipe.getLocalizacao() != null) {
-            stmt.setInt(index++, equipe.getLocalizacao().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
-
-        stmt.setTimestamp(index++, Timestamp.valueOf(equipe.getUpdatedAt()));
-        stmt.setTimestamp(index++, equipe.getDeletedAt() != null ?
-                Timestamp.valueOf(equipe.getDeletedAt()) : null);
-
-        stmt.setInt(index++, equipe.getId());
-    }
-
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 6;
-    }
-
-    @Override
-    protected Equipe mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Equipe equipe = new Equipe();
-        equipe.setId(rs.getInt("id_equipe"));
-        equipe.setNome(rs.getString("nm_equipe"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-
-        if (updatedAt != null) {
-            equipe.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            equipe.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int localizacaoId = rs.getInt("T_CCR_LOCALIZACAO_id");
-        if (!rs.wasNull() && localizacaoRepository != null) {
-            localizacaoRepository.buscarPorId(localizacaoId)
-                    .ifPresent(equipe::setLocalizacao);
-        }
-
-        int estacaoId = rs.getInt("estacao_base_id");
-        if (!rs.wasNull() && estacaoRepository != null) {
-            estacaoRepository.buscarPorId(estacaoId)
-                    .ifPresent(equipe::setBase);
-        }
-
-        equipe.setIntegrantes(carregarIntegrantes(equipe.getId()));
 
         return equipe;
     }
 
-    private ArrayList<Usuario> carregarIntegrantes(int equipeId) {
+    public Optional<Equipe> findById(Integer id) throws SQLException {
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
+                "FROM tb_mvp_equipe e " +
+                "WHERE e.id = ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Equipe equipe = mapResultSetToEquipe(rs);
+
+                    equipe.setIntegrantes(findIntegrantesByEquipeId(equipe.getId()));
+
+                    return Optional.of(equipe);
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    public List<Equipe> findAll() throws SQLException {
+        List<Equipe> equipes = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
+                "FROM tb_mvp_equipe e " +
+                "WHERE e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Equipe equipe = mapResultSetToEquipe(rs);
+
+                equipe.setIntegrantes(findIntegrantesByEquipeId(equipe.getId()));
+
+                equipes.add(equipe);
+            }
+        }
+
+        return equipes;
+    }
+
+    public Equipe update(Equipe equipe) throws SQLException {
+        String sql = "UPDATE tb_mvp_equipe SET nome = ?, base_id = ?, setor = ?, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, equipe.getNome());
+
+            if (equipe.getBase() != null) {
+                stmt.setInt(2, equipe.getBase().getId());
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
+
+            if (equipe.getSetor() != null) {
+                stmt.setString(3, equipe.getSetor().name());
+            } else {
+                stmt.setNull(3, Types.VARCHAR);
+            }
+
+            stmt.setInt(4, equipe.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar equipe, nenhuma linha afetada.");
+            }
+
+            if (equipe.getIntegrantes() != null) {
+                deleteEquipeUsuarioRelations(equipe.getId());
+
+                saveEquipeUsuarioRelations(equipe.getId(), equipe.getIntegrantes());
+            }
+        }
+
+        return equipe;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_equipe SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public List<Equipe> findByNome(String nome) throws SQLException {
+        List<Equipe> equipes = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
+                "FROM tb_mvp_equipe e " +
+                "WHERE e.nome LIKE ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, "%" + nome + "%");
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Equipe equipe = mapResultSetToEquipe(rs);
+
+                    equipe.setIntegrantes(findIntegrantesByEquipeId(equipe.getId()));
+
+                    equipes.add(equipe);
+                }
+            }
+        }
+
+        return equipes;
+    }
+
+    public List<Equipe> findBySetor(Setor setor) throws SQLException {
+        List<Equipe> equipes = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
+                "FROM tb_mvp_equipe e " +
+                "WHERE e.setor = ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, setor.name());
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Equipe equipe = mapResultSetToEquipe(rs);
+
+                    equipe.setIntegrantes(findIntegrantesByEquipeId(equipe.getId()));
+
+                    equipes.add(equipe);
+                }
+            }
+        }
+
+        return equipes;
+    }
+
+    public List<Equipe> findByBaseId(Integer baseId) throws SQLException {
+        List<Equipe> equipes = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
+                "FROM tb_mvp_equipe e " +
+                "WHERE e.base_id = ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, baseId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Equipe equipe = mapResultSetToEquipe(rs);
+
+                    equipe.setIntegrantes(findIntegrantesByEquipeId(equipe.getId()));
+
+                    equipes.add(equipe);
+                }
+            }
+        }
+
+        return equipes;
+    }
+
+    public List<Equipe> findByIntegranteId(Integer integranteId) throws SQLException {
+        List<Equipe> equipes = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.nome, e.base_id, e.setor " +
+                "FROM tb_mvp_equipe e " +
+                "JOIN tb_mvp_equipe_usuario eu ON e.id = eu.equipe_id " +
+                "WHERE eu.usuario_id = ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, integranteId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Equipe equipe = mapResultSetToEquipe(rs);
+
+                    // Carregar os integrantes relacionados
+                    equipe.setIntegrantes(findIntegrantesByEquipeId(equipe.getId()));
+
+                    equipes.add(equipe);
+                }
+            }
+        }
+
+        return equipes;
+    }
+
+    private ArrayList<Usuario> findIntegrantesByEquipeId(Integer equipeId) throws SQLException {
         ArrayList<Usuario> integrantes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT T_CCR_USUARIO_id FROM T_CCR_EQUIPE_USUARIO WHERE T_CCR_EQUIPE_id = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT u.id " +
+                "FROM tb_mvp_usuario u " +
+                "JOIN tb_mvp_equipe_usuario eu ON u.id = eu.usuario_id " +
+                "WHERE eu.equipe_id = ? AND u.deleted_at IS NULL " +
+                "ORDER BY u.id";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setInt(1, equipeId);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    int usuarioId = rs.getInt("T_CCR_USUARIO_id");
-                    usuarioRepository.buscarPorId(usuarioId)
-                            .ifPresent(integrantes::add);
+                    int integranteId = rs.getInt("id");
+                    Optional<Usuario> integranteOpt = usuarioRepository.findById(integranteId);
+                    integranteOpt.ifPresent(integrantes::add);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao carregar integrantes da equipe", e);
         }
 
         return integrantes;
     }
 
-    public void adicionarIntegrante(Equipe equipe, Usuario usuario) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "INSERT INTO T_CCR_EQUIPE_USUARIO(T_CCR_EQUIPE_id, T_CCR_USUARIO_id, dt_criacao) VALUES (?, ?, ?)")) {
+    private void saveEquipeUsuarioRelations(Integer equipeId, List<Usuario> integrantes) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_equipe_usuario (equipe_id, usuario_id) VALUES (?, ?)";
 
-            stmt.setInt(1, equipe.getId());
-            stmt.setInt(2, usuario.getId());
-            stmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            for (Usuario integrante : integrantes) {
+                stmt.setInt(1, equipeId);
+                stmt.setInt(2, integrante.getId());
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+        }
+    }
+
+    private void deleteEquipeUsuarioRelations(Integer equipeId) throws SQLException {
+        String sql = "DELETE FROM tb_mvp_equipe_usuario WHERE equipe_id = ?";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, equipeId);
             stmt.executeUpdate();
-
-            if (equipe.getIntegrantes() == null) {
-                equipe.setIntegrantes(new ArrayList<>());
-            }
-            equipe.getIntegrantes().add(usuario);
-
-        } catch (SQLException e) {
-            log.error("Erro ao adicionar integrante à equipe", e);
         }
     }
 
-    public void removerIntegrante(Equipe equipe, Usuario usuario) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "UPDATE T_CCR_EQUIPE_USUARIO SET dt_exclusao = ? WHERE T_CCR_EQUIPE_id = ? AND T_CCR_USUARIO_id = ?")) {
+    private Equipe mapResultSetToEquipe(ResultSet rs) throws SQLException {
+        Equipe equipe = new Equipe();
+        equipe.setId(rs.getInt("id"));
+        equipe.setNome(rs.getString("nome"));
 
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, equipe.getId());
-            stmt.setInt(3, usuario.getId());
-            stmt.executeUpdate();
-
-            if (equipe.getIntegrantes() != null) {
-                equipe.getIntegrantes().removeIf(u -> u.getId() == usuario.getId());
-            }
-
-        } catch (SQLException e) {
-            log.error("Erro ao remover integrante da equipe", e);
-        }
-    }
-
-    public List<Equipe> buscarPorNome(String nome) {
-        List<Equipe> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_EQUIPE WHERE nm_equipe LIKE ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, "%" + nome + "%");
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    resultado.add(mapResultSetToEntity(rs));
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar equipes por nome", e);
+        Integer baseId = rs.getInt("base_id");
+        if (!rs.wasNull()) {
+            Optional<Estacao> base = estacaoRepository.findById(baseId);
+            base.ifPresent(equipe::setBase);
         }
 
-        return resultado;
-    }
-
-    public List<Equipe> buscarPorLocalizacao(int localizacaoId) {
-        List<Equipe> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_EQUIPE WHERE T_CCR_LOCALIZACAO_id = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setInt(1, localizacaoId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    resultado.add(mapResultSetToEntity(rs));
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar equipes por localização", e);
+        String setorStr = rs.getString("setor");
+        if (setorStr != null) {
+            equipe.setSetor(Setor.valueOf(setorStr));
         }
 
-        return resultado;
-    }
-
-    public List<Equipe> buscarPorEstacaoBase(int estacaoId) {
-        List<Equipe> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_EQUIPE WHERE estacao_base_id = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setInt(1, estacaoId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    resultado.add(mapResultSetToEntity(rs));
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar equipes por estação base", e);
-        }
-
-        return resultado;
-    }
-
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
-
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
-
-            int result = stmt.executeUpdate();
-
-            if (result > 0) {
-                Optional<Equipe> equipe = buscarPorId(id);
-                equipe.ifPresent(e -> {
-                    e.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, e);
-                });
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao remover equipe", e);
-        }
+        return equipe;
     }
 }

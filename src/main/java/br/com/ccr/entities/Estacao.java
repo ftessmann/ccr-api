@@ -12,7 +12,6 @@ import java.util.ArrayList;
 public class Estacao extends BaseModel {
     private String nome;
     private Endereco endereco;
-    private ArrayList<Plataforma> plataformas;
     private ArrayList<Linha> linhas;
 
     public String getNome() {
@@ -29,14 +28,6 @@ public class Estacao extends BaseModel {
 
     public void setEndereco(Endereco endereco) {
         this.endereco = endereco;
-    }
-
-    public ArrayList<Plataforma> getPlataformas() {
-        return plataformas;
-    }
-
-    public void setPlataformas(ArrayList<Plataforma> plataformas) {
-        this.plataformas = plataformas;
     }
 
     public ArrayList<Linha> getLinhas() {

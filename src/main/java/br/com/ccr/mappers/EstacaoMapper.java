@@ -4,6 +4,7 @@ import br.com.ccr.dtos.EstacaoDTO;
 import br.com.ccr.entities.Estacao;
 import br.com.ccr.entities.Linha;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.stream.Collectors;
@@ -11,12 +12,14 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class EstacaoMapper {
 
-    private final EnderecoMapper enderecoMapper;
-    private final LinhaMapper linhaMapper;
+    @Inject
+    private EnderecoMapper enderecoMapper;
+
+    @Inject
+    private LinhaMapper linhaMapper;
 
     public EstacaoMapper() {
-        this.enderecoMapper = new EnderecoMapper();
-        this.linhaMapper = new LinhaMapper();
+
     }
 
     public EstacaoDTO toDTO(Estacao estacao) {

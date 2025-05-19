@@ -5,6 +5,7 @@ import br.com.ccr.entities.Trem;
 import br.com.ccr.entities.Usuario;
 import br.com.ccr.entities.Vagao;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.stream.Collectors;
@@ -12,16 +13,16 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class TremMapper {
 
-    private final EstacaoMapper estacaoMapper;
-    private final LinhaMapper linhaMapper;
-    private final UsuarioMapper usuarioMapper;
-    private final VagaoMapper vagaoMapper;
+    @Inject
+    private EstacaoMapper estacaoMapper;
+    @Inject
+    private LinhaMapper linhaMapper;
+    @Inject
+    private UsuarioMapper usuarioMapper;
+    @Inject
+    private VagaoMapper vagaoMapper;
 
     public TremMapper() {
-        this.estacaoMapper = new EstacaoMapper();
-        this.linhaMapper = new LinhaMapper();
-        this.usuarioMapper = new UsuarioMapper();
-        this.vagaoMapper = new VagaoMapper();
     }
 
     public TremDTO toDTO(Trem trem) {

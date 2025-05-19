@@ -4,6 +4,7 @@ import br.com.ccr.dtos.EquipeDTO;
 import br.com.ccr.entities.Equipe;
 import br.com.ccr.entities.Usuario;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.stream.Collectors;
@@ -11,12 +12,13 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class EquipeMapper {
 
-    private final EstacaoMapper estacaoMapper;
-    private final UsuarioMapper usuarioMapper;
+    @Inject
+    private EstacaoMapper estacaoMapper;
+
+    @Inject
+    private UsuarioMapper usuarioMapper;
 
     public EquipeMapper() {
-        this.estacaoMapper = new EstacaoMapper();
-        this.usuarioMapper = new UsuarioMapper();
     }
 
     public EquipeDTO toDTO(Equipe equipe) {

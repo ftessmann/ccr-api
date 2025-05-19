@@ -88,14 +88,13 @@ public class LinhaRepository {
             while (rs.next()) {
                 Linha linha = mapResultSetToLinha(rs);
 
-                linha.setEstacoes(findEstacoesByLinhaId(linha.getId()));
-
                 linhas.add(linha);
             }
         }
 
         return linhas;
     }
+
 
     public Linha update(Linha linha) throws SQLException {
         String sql = "UPDATE tb_mvp_linha SET nome = ?, updated_at = CURRENT_TIMESTAMP " +

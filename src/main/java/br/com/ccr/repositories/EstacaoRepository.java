@@ -106,8 +106,6 @@ public class EstacaoRepository {
             while (rs.next()) {
                 Estacao estacao = mapResultSetToEstacao(rs);
 
-                estacao.setLinhas(findLinhasByEstacaoId(estacao.getId()));
-
                 estacoes.add(estacao);
             }
         }

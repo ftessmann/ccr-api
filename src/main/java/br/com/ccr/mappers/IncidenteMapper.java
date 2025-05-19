@@ -3,14 +3,16 @@ package br.com.ccr.mappers;
 import br.com.ccr.dtos.IncidenteDTO;
 import br.com.ccr.entities.Incidente;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class IncidenteMapper {
 
-    private final UsuarioMapper usuarioMapper;
+    @Inject
+    private UsuarioMapper usuarioMapper;
 
     public IncidenteMapper() {
-        this.usuarioMapper = new UsuarioMapper();
+
     }
 
     public IncidenteDTO toDTO(Incidente incidente) {

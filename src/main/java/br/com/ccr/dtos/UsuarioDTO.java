@@ -4,30 +4,25 @@ import br.com.ccr.entities.Cargo;
 import br.com.ccr.entities.Setor;
 
 public class UsuarioDTO {
+    private Integer id;
     private String nome;
     private String cpf;
     private String email;
     private String senha;
     private String telefone;
-    private int enderecoId; // ID do endereço como campo separado
+    private EnderecoDTO endereco;
     private Cargo cargo;
     private Setor setor;
 
-    public UsuarioDTO() {
-    }
-
-    public UsuarioDTO(String nome, String cpf, String email, String senha, String telefone, int enderecoId, Cargo cargo, Setor setor) {
-        this.nome = nome;
-        this.cpf = cpf;
-        this.email = email;
-        this.senha = senha;
-        this.telefone = telefone;
-        this.enderecoId = enderecoId;
-        this.cargo = cargo;
-        this.setor = setor;
-    }
-
     // Getters e Setters
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
     public String getNome() {
         return nome;
     }
@@ -68,12 +63,12 @@ public class UsuarioDTO {
         this.telefone = telefone;
     }
 
-    public int getEnderecoId() {
-        return enderecoId;
+    public EnderecoDTO getEndereco() {
+        return endereco;
     }
 
-    public void setEnderecoId(int enderecoId) {
-        this.enderecoId = enderecoId;
+    public void setEndereco(EnderecoDTO endereco) {
+        this.endereco = endereco;
     }
 
     public Cargo getCargo() {

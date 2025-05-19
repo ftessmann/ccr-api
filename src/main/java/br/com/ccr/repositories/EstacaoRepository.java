@@ -1,345 +1,287 @@
 package br.com.ccr.repositories;
 
+import br.com.ccr.entities.Endereco;
 import br.com.ccr.entities.Estacao;
 import br.com.ccr.entities.Linha;
-import br.com.ccr.entities.Plataforma;
 import br.com.ccr.infrastructure.DatabaseConfig;
-
 import jakarta.enterprise.context.ApplicationScoped;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import jakarta.inject.Inject;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
-public class EstacaoRepository extends CrudRepositoryImpl<Estacao> {
+public class EstacaoRepository {
 
-    private static final Logger log = LogManager.getLogger(EstacaoRepository.class);
-
+    @Inject
     private EnderecoRepository enderecoRepository;
-    private PlataformaRepository plataformaRepository;
+
+    @Inject
     private LinhaRepository linhaRepository;
 
-    public EstacaoRepository() {}
-
-    public EstacaoRepository(
-            EnderecoRepository enderecoRepository,
-            PlataformaRepository plataformaRepository,
-            LinhaRepository linhaRepository
-    ) {
-        this.enderecoRepository = enderecoRepository;
-        this.plataformaRepository = plataformaRepository;
-        this.linhaRepository = linhaRepository;
+    public EstacaoRepository() {
     }
 
-    public EstacaoRepository(EnderecoRepository enderecoRepository) {
-        this.enderecoRepository = enderecoRepository;
-        this.plataformaRepository = null;
-        this.linhaRepository = null;
-    }
-
-    @Override
-    protected String getTableName() {
-        return "T_CCR_ESTACAO";
-    }
-
-    @Override
-    protected String getInsertQuery() {
-        return "INSERT INTO T_CCR_ESTACAO(nm_estacao, T_CCR_ENDERECO_id_endereco, dt_criacao, dt_atualizacao, dt_exclusao) " +
-                "VALUES (?, ?, ?, ?, ?)";
-    }
-
-    @Override
-    protected String getUpdateQuery() {
-        return "UPDATE T_CCR_ESTACAO SET nm_estacao = ?, T_CCR_ENDERECO_id_endereco = ?, " +
-                "dt_atualizacao = ?, dt_exclusao = ? WHERE id_estacao = ?";
-    }
-
-    @Override
-    protected String getFindByIdQuery() {
-        return "SELECT * FROM T_CCR_ESTACAO WHERE id_estacao = ? AND dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getFindAllQuery() {
-        return "SELECT * FROM T_CCR_ESTACAO WHERE dt_exclusao IS NULL";
-    }
-
-    @Override
-    protected String getDeleteQuery() {
-        return "UPDATE T_CCR_ESTACAO SET dt_exclusao = ? WHERE id_estacao = ?";
-    }
-
-    @Override
-    protected void prepareStatementForInsert(PreparedStatement stmt, Estacao estacao) throws SQLException {
-        int index = 1;
-        stmt.setString(index++, estacao.getNome());
-
+    public Estacao save(Estacao estacao) throws SQLException {
         if (estacao.getEndereco() != null) {
-            stmt.setInt(index++, estacao.getEndereco().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
+            if (estacao.getEndereco().getId() == null) {
+                Endereco savedEndereco = enderecoRepository.save(estacao.getEndereco());
+                estacao.setEndereco(savedEndereco);
+            }
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        estacao.setCreatedAt(now);
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, estacao.getUpdatedAt() != null ?
-                Timestamp.valueOf(estacao.getUpdatedAt()) : null);
-        stmt.setTimestamp(index++, estacao.getDeletedAt() != null ?
-                Timestamp.valueOf(estacao.getDeletedAt()) : null);
-    }
+        String sql = "INSERT INTO tb_mvp_estacao (nome, endereco_id, created_at) " +
+                "VALUES (?, ?, CURRENT_TIMESTAMP)";
 
-    @Override
-    protected void prepareStatementForUpdate(PreparedStatement stmt, Estacao estacao) throws SQLException {
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-        LocalDateTime now = LocalDateTime.now();
-        estacao.setUpdatedAt(now);
+            stmt.setString(1, estacao.getNome());
 
-        int index = 1;
-        stmt.setString(index++, estacao.getNome());
+            if (estacao.getEndereco() != null) {
+                stmt.setInt(2, estacao.getEndereco().getId());
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
 
-        if (estacao.getEndereco() != null) {
-            stmt.setInt(index++, estacao.getEndereco().getId());
-        } else {
-            stmt.setNull(index++, java.sql.Types.INTEGER);
-        }
+            int affectedRows = stmt.executeUpdate();
 
-        stmt.setTimestamp(index++, Timestamp.valueOf(now));
-        stmt.setTimestamp(index++, estacao.getDeletedAt() != null ?
-                Timestamp.valueOf(estacao.getDeletedAt()) : null);
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao criar estação, nenhuma linha afetada.");
+            }
 
-        stmt.setInt(index++, estacao.getId());
-    }
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    estacao.setId(generatedKeys.getInt(1));
+                } else {
+                    throw new SQLException("Falha ao criar estação, nenhum ID obtido.");
+                }
+            }
 
-    @Override
-    protected int getUpdateQueryIdParameterIndex() {
-        return 5;
-    }
-
-    @Override
-    protected Estacao mapResultSetToEntity(ResultSet rs) throws SQLException {
-        Estacao estacao = new Estacao();
-        estacao.setId(rs.getInt("id_estacao"));
-        estacao.setNome(rs.getString("nm_estacao"));
-
-        Timestamp createdAt = rs.getTimestamp("dt_criacao");
-        Timestamp updatedAt = rs.getTimestamp("dt_atualizacao");
-        Timestamp deletedAt = rs.getTimestamp("dt_exclusao");
-
-        if (createdAt != null) {
-            estacao.setCreatedAt(createdAt.toLocalDateTime());
-        }
-        if (updatedAt != null) {
-            estacao.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
-        if (deletedAt != null) {
-            estacao.setDeletedAt(deletedAt.toLocalDateTime());
-        }
-
-        int enderecoId = rs.getInt("T_CCR_ENDERECO_id_endereco");
-        if (!rs.wasNull() && enderecoRepository != null) {
-            enderecoRepository.buscarPorId(enderecoId)
-                    .ifPresent(estacao::setEndereco);
-        }
-
-        if (plataformaRepository != null) {
-            estacao.setPlataformas(carregarPlataformas(estacao.getId()));
-        } else {
-            estacao.setPlataformas(new ArrayList<>());
-        }
-
-        if (linhaRepository != null) {
-            estacao.setLinhas(carregarLinhas(estacao.getId()));
-        } else {
-            estacao.setLinhas(new ArrayList<>());
+            if (estacao.getLinhas() != null && !estacao.getLinhas().isEmpty()) {
+                saveEstacaoLinhaRelations(estacao.getId(), estacao.getLinhas());
+            }
         }
 
         return estacao;
     }
-    // rodar este metodo sem plataformas inseridas irá causar um NullPointer
-    private ArrayList<Plataforma> carregarPlataformas(int estacaoId) {
-        ArrayList<Plataforma> plataformas = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_PLATAFORMA WHERE T_CCR_ESTACAO_id_estacao = ? AND dt_exclusao IS NULL")) {
+    public Optional<Estacao> findById(Integer id) throws SQLException {
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
+                "FROM tb_mvp_estacao e " +
+                "WHERE e.id = ? AND e.deleted_at IS NULL";
 
-            stmt.setInt(1, estacaoId);
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Plataforma plataforma = plataformaRepository.mapResultSetToEntity(rs);
-                    plataformas.add(plataforma);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao carregar plataformas da estação", e);
-        }
+            stmt.setInt(1, id);
 
-        return plataformas;
-    }
-
-    // rodar este metodo sem linhas inseridas irá causar um NullPointer
-    private ArrayList<Linha> carregarLinhas(int estacaoId) {
-        ArrayList<Linha> linhas = new ArrayList<>();
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT l.* FROM T_CCR_LINHA l " +
-                             "JOIN T_CCR_LINHA_ESTACAO le ON l.id_linha = le.T_CCR_LINHA_id " +
-                             "WHERE le.T_CCR_ESTACAO_id = ? AND l.dt_exclusao IS NULL AND le.dt_exclusao IS NULL " +
-                             "ORDER BY le.ordem")) {
-
-            stmt.setInt(1, estacaoId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Linha linha = linhaRepository.mapResultSetToEntity(rs);
-                    linhas.add(linha);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao carregar linhas da estação", e);
-        }
-
-        return linhas;
-    }
-
-    @Override
-    public void remover(int id) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(getDeleteQuery())) {
-
-            stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
-            stmt.setInt(2, id);
-
-            int result = stmt.executeUpdate();
-
-            if (result > 0) {
-
-                Optional<Estacao> estacao = buscarPorId(id);
-                estacao.ifPresent(e -> {
-                    e.setDeletedAt(LocalDateTime.now());
-                    storage.put(id, e);
-                });
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao remover estação", e);
-        }
-    }
-
-    // metodos adicionais para Estacao
-
-    public Optional<Estacao> buscarPorNome(String nome) {
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_ESTACAO WHERE nm_estacao = ? AND dt_exclusao IS NULL")) {
-
-            stmt.setString(1, nome);
-
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    Estacao estacao = mapResultSetToEntity(rs);
-                    storage.put(estacao.getId(), estacao);
+                    Estacao estacao = mapResultSetToEstacao(rs);
+
+                    estacao.setLinhas(findLinhasByEstacaoId(estacao.getId()));
+
                     return Optional.of(estacao);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar estação por nome", e);
         }
 
         return Optional.empty();
     }
 
-    public List<Estacao> buscarPorNomeParcial(String nome) {
-        List<Estacao> resultado = new ArrayList<>();
+    public List<Estacao> findAll() throws SQLException {
+        List<Estacao> estacoes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_ESTACAO WHERE nm_estacao LIKE ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
+                "FROM tb_mvp_estacao e " +
+                "WHERE e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Estacao estacao = mapResultSetToEstacao(rs);
+
+                estacao.setLinhas(findLinhasByEstacaoId(estacao.getId()));
+
+                estacoes.add(estacao);
+            }
+        }
+
+        return estacoes;
+    }
+
+    public Estacao update(Estacao estacao) throws SQLException {
+        if (estacao.getEndereco() != null) {
+            enderecoRepository.update(estacao.getEndereco());
+        }
+
+        String sql = "UPDATE tb_mvp_estacao SET nome = ?, endereco_id = ?, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setString(1, estacao.getNome());
+
+            if (estacao.getEndereco() != null) {
+                stmt.setInt(2, estacao.getEndereco().getId());
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
+
+            stmt.setInt(3, estacao.getId());
+
+            int affectedRows = stmt.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Falha ao atualizar estação, nenhuma linha afetada.");
+            }
+
+            if (estacao.getLinhas() != null) {
+                deleteEstacaoLinhaRelations(estacao.getId());
+
+                saveEstacaoLinhaRelations(estacao.getId(), estacao.getLinhas());
+            }
+        }
+
+        return estacao;
+    }
+
+    public boolean deleteById(Integer id) throws SQLException {
+        String sql = "UPDATE tb_mvp_estacao SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+
+            int affectedRows = stmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    public List<Estacao> findByNome(String nome) throws SQLException {
+        List<Estacao> estacoes = new ArrayList<>();
+
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
+                "FROM tb_mvp_estacao e " +
+                "WHERE e.nome LIKE ? AND e.deleted_at IS NULL";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setString(1, "%" + nome + "%");
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Estacao estacao = mapResultSetToEntity(rs);
-                    resultado.add(estacao);
-                    storage.put(estacao.getId(), estacao);
+                    Estacao estacao = mapResultSetToEstacao(rs);
+
+                    estacao.setLinhas(findLinhasByEstacaoId(estacao.getId()));
+
+                    estacoes.add(estacao);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar estações por nome parcial", e);
         }
 
-        return resultado;
+        return estacoes;
     }
 
-    public List<Estacao> buscarPorEndereco(int enderecoId) {
-        List<Estacao> resultado = new ArrayList<>();
+    public List<Estacao> findByLinhaId(Integer linhaId) throws SQLException {
+        List<Estacao> estacoes = new ArrayList<>();
 
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT * FROM T_CCR_ESTACAO WHERE T_CCR_ENDERECO_id_endereco = ? AND dt_exclusao IS NULL")) {
+        String sql = "SELECT e.id, e.nome, e.endereco_id " +
+                "FROM tb_mvp_estacao e " +
+                "JOIN tb_mvp_estacao_linha el ON e.id = el.estacao_id " +
+                "WHERE el.linha_id = ? AND e.deleted_at IS NULL";
 
-            stmt.setInt(1, enderecoId);
-
-            try (var rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Estacao estacao = mapResultSetToEntity(rs);
-                    resultado.add(estacao);
-                    storage.put(estacao.getId(), estacao);
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar estações por endereço", e);
-        }
-
-        return resultado;
-    }
-
-    public List<Estacao> buscarPorLinha(int linhaId) {
-        List<Estacao> resultado = new ArrayList<>();
-
-        try (var connection = DatabaseConfig.getConnection();
-             var stmt = connection.prepareStatement(
-                     "SELECT e.* FROM T_CCR_ESTACAO e " +
-                             "JOIN T_CCR_LINHA_ESTACAO le ON e.id_estacao = le.T_CCR_ESTACAO_id " +
-                             "WHERE le.T_CCR_LINHA_id = ? AND e.dt_exclusao IS NULL AND le.dt_exclusao IS NULL " +
-                             "ORDER BY le.ordem")) {
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
 
             stmt.setInt(1, linhaId);
 
-            try (var rs = stmt.executeQuery()) {
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Estacao estacao = mapResultSetToEntity(rs);
-                    resultado.add(estacao);
-                    storage.put(estacao.getId(), estacao);
+                    Estacao estacao = mapResultSetToEstacao(rs);
+
+                    estacao.setLinhas(findLinhasByEstacaoId(estacao.getId()));
+
+                    estacoes.add(estacao);
                 }
             }
-        } catch (SQLException e) {
-            log.error("Erro ao buscar estações por linha", e);
         }
 
-        return resultado;
+        return estacoes;
     }
 
-    public void adicionarPlataforma(Estacao estacao, Plataforma plataforma) {
-        if (plataformaRepository != null) {
-            plataforma.setEstacao(estacao);
-            plataformaRepository.salvar(plataforma);
+    private ArrayList<Linha> findLinhasByEstacaoId(Integer estacaoId) throws SQLException {
+        ArrayList<Linha> linhas = new ArrayList<>();
 
-            if (estacao.getPlataformas() == null) {
-                estacao.setPlataformas(new ArrayList<>());
+        String sql = "SELECT l.id " +
+                "FROM tb_mvp_linha l " +
+                "JOIN tb_mvp_estacao_linha el ON l.id = el.linha_id " +
+                "WHERE el.estacao_id = ? AND l.deleted_at IS NULL " +
+                "ORDER BY l.id";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, estacaoId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    int linhaId = rs.getInt("id");
+                    Optional<Linha> linhaOpt = linhaRepository.findById(linhaId);
+                    linhaOpt.ifPresent(linhas::add);
+                }
             }
-            estacao.getPlataformas().add(plataforma);
+        }
+
+        return linhas;
+    }
+
+    private void saveEstacaoLinhaRelations(Integer estacaoId, List<Linha> linhas) throws SQLException {
+        String sql = "INSERT INTO tb_mvp_estacao_linha (estacao_id, linha_id) VALUES (?, ?)";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            for (Linha linha : linhas) {
+                stmt.setInt(1, estacaoId);
+                stmt.setInt(2, linha.getId());
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
         }
     }
 
+    private void deleteEstacaoLinhaRelations(Integer estacaoId) throws SQLException {
+        String sql = "DELETE FROM tb_mvp_estacao_linha WHERE estacao_id = ?";
+
+        try (Connection connection = DatabaseConfig.getConnection();
+             PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+            stmt.setInt(1, estacaoId);
+            stmt.executeUpdate();
+        }
+    }
+
+    private Estacao mapResultSetToEstacao(ResultSet rs) throws SQLException {
+        Estacao estacao = new Estacao();
+        estacao.setId(rs.getInt("id"));
+        estacao.setNome(rs.getString("nome"));
+
+        Integer enderecoId = rs.getInt("endereco_id");
+        if (!rs.wasNull()) {
+            Optional<Endereco> endereco = enderecoRepository.findById(enderecoId);
+            endereco.ifPresent(estacao::setEndereco);
+        }
+
+        return estacao;
+    }
 }

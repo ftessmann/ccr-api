@@ -1,22 +1,24 @@
-package br.com.ccr.entities;
+package br.com.ccr.dtos;
 
-import lombok.*;
+import br.com.ccr.entities.Gravidade;
 
-import java.time.LocalDateTime;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@EqualsAndHashCode
-@ToString
-public class Incidente extends BaseModel{
+public class IncidenteDTO {
+    private Integer id;
     private String latitude;
     private String longitude;
     private String descricao;
     private Gravidade gravidade;
     private String nome;
-    private Usuario criador;
+    private UsuarioDTO criador;
     private Boolean isResolved;
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
 
     public String getLatitude() {
         return latitude;
@@ -32,14 +34,6 @@ public class Incidente extends BaseModel{
 
     public void setLongitude(String longitude) {
         this.longitude = longitude;
-    }
-
-    public Boolean getIsResolved() {
-        return isResolved;
-    }
-
-    public void setIsResolved(Boolean resolved) {
-        isResolved = resolved;
     }
 
     public String getDescricao() {
@@ -66,12 +60,19 @@ public class Incidente extends BaseModel{
         this.nome = nome;
     }
 
-    public Usuario getCriador() {
+    public UsuarioDTO getCriador() {
         return criador;
     }
 
-    public void setCriador(Usuario criador) {
+    public void setCriador(UsuarioDTO criador) {
         this.criador = criador;
     }
 
+    public Boolean getIsResolved() {
+        return isResolved;
+    }
+
+    public void setIsResolved(Boolean isResolved) {
+        this.isResolved = isResolved;
+    }
 }

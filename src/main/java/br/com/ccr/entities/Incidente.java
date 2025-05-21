@@ -17,6 +17,15 @@ public class Incidente extends BaseModel{
     private String nome;
     private Usuario criador;
     private Boolean isResolved;
+    private String imageUrl;
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
 
     public String getLatitude() {
         return latitude;

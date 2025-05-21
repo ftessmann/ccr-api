@@ -28,7 +28,7 @@ public class IncidenteMapper {
         dto.setGravidade(incidente.getGravidade());
         dto.setNome(incidente.getNome());
         dto.setIsResolved(incidente.getIsResolved());
-
+        dto.setImageUrl(incidente.getImageUrl());
         if (incidente.getCriador() != null) {
             dto.setCriador(usuarioMapper.toDTO(incidente.getCriador()));
         }
@@ -49,6 +49,7 @@ public class IncidenteMapper {
         incidente.setGravidade(dto.getGravidade());
         incidente.setNome(dto.getNome());
         incidente.setIsResolved(dto.getIsResolved());
+        incidente.setImageUrl(dto.getImageUrl());
 
         if (dto.getCriador() != null) {
             incidente.setCriador(usuarioMapper.toEntity(dto.getCriador()));

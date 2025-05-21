@@ -22,8 +22,8 @@ public class IncidenteRepository {
     }
 
     public Incidente save(Incidente incidente) throws SQLException {
-        String sql = "INSERT INTO tb_mvp_incidente (latitude, longitude, descricao, gravidade, nome, criador_id, is_resolved, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+        String sql = "INSERT INTO tb_mvp_incidente (latitude, longitude, descricao, gravidade, nome, criador_id, is_resolved, image_url, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
 
         try (Connection connection = DatabaseConfig.getConnection();
              PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -48,27 +48,18 @@ public class IncidenteRepository {
 
             stmt.setString(7, incidente.getIsResolved() ? "S" : "N");
 
+            stmt.setString(8, incidente.getImageUrl());
+
             int affectedRows = stmt.executeUpdate();
-
-            if (affectedRows == 0) {
-                throw new SQLException("Falha ao criar incidente, nenhuma linha afetada.");
-            }
-
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    incidente.setId(generatedKeys.getInt(1));
-                } else {
-                    throw new SQLException("Falha ao criar incidente, nenhum ID obtido.");
-                }
-            }
         }
 
         return incidente;
     }
 
+
     public Optional<Incidente> findById(Integer id) throws SQLException {
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved " +
+                "i.criador_id, i.is_resolved, i.image_url " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.id = ? AND i.deleted_at IS NULL";
 
@@ -92,7 +83,7 @@ public class IncidenteRepository {
         List<Incidente> incidentes = new ArrayList<>();
 
         String sql = "SELECT i.id, i.latitude, i.longitude, i.descricao, i.gravidade, i.nome, " +
-                "i.criador_id, i.is_resolved " +
+                "i.criador_id, i.is_resolved, i.image_url " +
                 "FROM tb_mvp_incidente i " +
                 "WHERE i.deleted_at IS NULL " +
                 "ORDER BY i.created_at DESC";
@@ -112,7 +103,7 @@ public class IncidenteRepository {
 
     public Incidente update(Incidente incidente) throws SQLException {
         String sql = "UPDATE tb_mvp_incidente SET latitude = ?, longitude = ?, descricao = ?, " +
-                "gravidade = ?, nome = ?, criador_id = ?, is_resolved = ?, updated_at = CURRENT_TIMESTAMP " +
+                "gravidade = ?, nome = ?, criador_id = ?, is_resolved = ?, image_url = ?, updated_at = CURRENT_TIMESTAMP " +
                 "WHERE id = ? AND deleted_at IS NULL";
 
         try (Connection connection = DatabaseConfig.getConnection();
@@ -137,7 +128,10 @@ public class IncidenteRepository {
             }
 
             stmt.setString(7, incidente.getIsResolved() ? "S" : "N");
-            stmt.setInt(8, incidente.getId());
+
+            stmt.setString(8, incidente.getImageUrl());
+
+            stmt.setInt(9, incidente.getId());
 
             int affectedRows = stmt.executeUpdate();
 
@@ -148,6 +142,7 @@ public class IncidenteRepository {
 
         return incidente;
     }
+
 
     public boolean deleteById(Integer id) throws SQLException {
         String sql = "UPDATE tb_mvp_incidente SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL";
@@ -259,6 +254,8 @@ public class IncidenteRepository {
 
         String isResolvedStr = rs.getString("is_resolved");
         incidente.setIsResolved(isResolvedStr != null && isResolvedStr.equals("S"));
+
+        incidente.setImageUrl(rs.getString("image_url"));
 
         return incidente;
     }

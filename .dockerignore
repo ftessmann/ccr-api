@@ -3,5 +3,5 @@
 .vscode
 *.iml
 .DS_Store
-
+*.pdf
 !target/quarkus-app/
